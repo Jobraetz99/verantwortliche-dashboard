@@ -1,0 +1,2284 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BM Group — OKR Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<style>
+:root{--red:#C03B35;--red-bg:rgba(192,59,53,.08);--dark:#020101;--bg:#fdfaf8;--card:#fff;--muted:#777;--border:#eaeaea;--teal:#00bfa6;--teal-bg:rgba(0,191,166,.08);--radius:24px;--shadow:0 10px 30px rgba(0,0,0,.03);--amber:#d97706;--amber-bg:rgba(217,119,6,.08);--ergo:#e07a5f;--green:#2d6a4f}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh;line-height:1.6}
+#lo{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999}.lb{text-align:center;width:400px;max-width:92vw}.lb h1{font-family:'Montserrat',sans-serif;font-size:clamp(32px,8vw,42px);font-weight:900;color:var(--red);margin-bottom:4px;letter-spacing:-.03em}.lb p{color:var(--muted);font-size:14px;margin-bottom:32px}
+.l-btn{width:100%;padding:16px;border:none;border-radius:100px;background:var(--red);color:#fff;font-family:'Montserrat',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;gap:8px}.l-btn:hover{background:#a3302c;transform:translateY(-2px)}.l-err{color:var(--red);font-size:13px;margin-top:12px;font-weight:600;display:none}
+.loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9998}.loading.h{display:none}.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}@keyframes spin{to{transform:rotate(360deg)}}
+#db{display:none;padding:0 24px 32px;overflow-x:hidden}.mx{max-width:1200px;margin:0 auto}
+/* ===== Top-Leiste (Tabs + Region) ===== */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(253,250,248,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);margin:0 -24px 24px;padding:10px 24px 0}
+.tb-in{max-width:1200px;margin:0 auto}
+.tb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tb-brand{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:900;color:var(--red);letter-spacing:-.02em;margin-right:6px}
+.tb-tabs{display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex:1}
+.tb-tabs::-webkit-scrollbar{display:none}
+.tb-tab{display:inline-flex;align-items:center;gap:7px;padding:10px 16px 12px;color:var(--muted);font-family:'Poppins',sans-serif;font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;transition:all .15s;border-radius:10px 10px 0 0}
+.tb-tab:hover{color:var(--red);background:var(--red-bg)}
+.tb-tab.a{color:var(--red);font-weight:700;border-bottom-color:var(--red)}
+.tb-tab .ti{font-size:15px}
+.tb-regs{display:flex;gap:5px;align-items:center;padding-bottom:8px}
+.tb-reg{padding:6px 14px;border-radius:100px;border:2px solid var(--border);background:#fff;color:var(--muted);font-size:11.5px;font-weight:500;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .15s;white-space:nowrap}
+.tb-reg:hover{border-color:var(--red);color:var(--red)}
+.tb-reg.a{border-color:var(--red);background:var(--red-bg);color:var(--red);font-weight:600}
+.tabsec{display:none}.tabsec.act{display:block}
+.reg-hint{margin:0 0 16px;padding:10px 16px;border-radius:14px;background:var(--amber-bg);color:var(--amber);font-size:12px;border:1px solid rgba(217,119,6,.2)}
+@media(max-width:800px){
+  .tb-brand{display:none}
+  .tb-row{flex-direction:column;align-items:stretch;gap:0}
+  .tb-tab{padding:8px 12px 10px;font-size:11px}
+  .tb-regs{padding:6px 0 8px}
+}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:12px}.hdr h1{font-family:'Montserrat',sans-serif;font-size:28px;font-weight:900;letter-spacing:-.03em}.hdr h1 span{color:var(--red)}.hdr-r{display:flex;gap:8px}.hdr-btn{padding:8px 16px;border-radius:100px;border:2px solid var(--border);background:#fff;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .2s}.hdr-btn:hover{border-color:var(--red);color:var(--red)}
+.vision{text-align:center;padding:28px 20px;margin-bottom:12px;background:linear-gradient(135deg,#fdfaf8,#f5efe8);border-radius:var(--radius);border:1px solid var(--border)}.vision h2{font-family:'Montserrat',sans-serif;font-size:24px;font-weight:900;letter-spacing:-.02em}.vision p{color:var(--muted);font-size:13px}
+.flt{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;align-items:center}
+.fl{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-right:4px}
+.fp{padding:8px 20px;border-radius:100px;border:2px solid var(--border);background:#fff;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:'Poppins',sans-serif;display:inline-flex;align-items:center;gap:7px}.fp:hover{border-color:var(--red);color:var(--red)}.fp.a{border-color:var(--red);background:var(--red-bg);color:var(--red);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}.sep{width:1px;height:28px;background:var(--border);margin:0 8px}
+.st{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:800;color:var(--red);margin:36px 0 18px;letter-spacing:-.01em}
+.okr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:20px}
+.okr{background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow)}
+.okr-head{padding:18px 84px 18px 22px;color:#fff;position:relative;min-height:130px;display:flex;flex-direction:column;justify-content:flex-start;gap:6px}.okr-head.q{background:var(--red)}.okr-head.w{background:var(--green)}.okr-head.t{background:var(--teal)}
+.okr-cat{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;opacity:.7}.okr-obj{font-size:12.5px;font-weight:500;line-height:1.45;opacity:.92}
+.okr-score{position:absolute;top:14px;right:14px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-size:15px;font-weight:900;border:2px solid rgba(255,255,255,.15)}
+.okr-body{padding:20px 24px}
+.kr{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f5f3f0}.kr:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.kr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:8px}.kr-name{font-size:12px;font-weight:500;flex:1}.kr-vals{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.kr-ist{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;padding:3px 10px;border-radius:8px}
+.kr-ist.g{background:var(--teal-bg);color:var(--teal)}.kr-ist.y{background:var(--amber-bg);color:var(--amber)}.kr-ist.r{background:var(--red-bg);color:var(--red)}.kr-ist.n{background:#f5f5f5;color:#aaa}
+.kr-ziel{font-size:10px;color:var(--muted);font-weight:500}
+.kr-bar{height:5px;background:#f0ede8;border-radius:3px;overflow:hidden;margin-top:3px}.kr-fill{height:100%;border-radius:3px;transition:width .6s}.kr-fill.g{background:var(--teal)}.kr-fill.y{background:var(--amber)}.kr-fill.r{background:var(--red)}
+.kr-manual{font-size:10px;color:var(--muted);font-style:italic;margin-top:2px}
+.kr-check{cursor:pointer;user-select:none}
+.fb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:32px}
+.fb-card{background:var(--card);border-radius:16px;padding:14px;border:1px solid var(--border);box-shadow:var(--shadow)}
+.fb-stars{color:var(--amber);font-size:15px;margin-bottom:3px;letter-spacing:2px}.fb-text{font-size:11px;color:var(--dark);line-height:1.5;margin-bottom:4px;font-style:italic}.fb-meta{font-size:10px;color:var(--muted);display:flex;justify-content:space-between}
+.ausl-nav{display:flex;align-items:center;gap:12px;margin-bottom:16px}.ausl-nav h3{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:800}
+.nav-btn{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .2s}.nav-btn:hover{border-color:var(--red);color:var(--red)}
+.ausl-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.ac{background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border);box-shadow:var(--shadow)}
+.ac h4{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.ab{display:flex;align-items:center;gap:10px;margin-bottom:10px}.ab-l{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;width:100px;display:flex;align-items:center;gap:5px}.ab-t{flex:1;height:26px;background:#f3f2ef;border-radius:8px;overflow:hidden;position:relative}.ab-f{height:100%;border-radius:8px;display:flex;align-items:center;padding:0 8px;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;color:#fff;min-width:40px}.ab-tgt{position:absolute;top:0;bottom:0;left:93%;width:2px;background:var(--dark);opacity:.15}.ab-v{font-family:'Montserrat',sans-serif;font-size:14px;font-weight:900;width:55px;text-align:right}
+.ft{text-align:center;padding:24px;font-size:12px;color:var(--muted);font-family:'Montserrat',sans-serif;font-weight:600}
+table{width:100%;border-collapse:separate;border-spacing:0 3px;font-size:13px}thead th{text-align:left;padding:10px 12px;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);white-space:nowrap}tbody tr{background:var(--card);transition:background .15s}tbody tr:hover{background:rgba(192,59,53,.03)}td{padding:10px 12px;white-space:nowrap}
+.eph-badge{display:inline-block;padding:3px 10px;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;min-width:55px;text-align:center}
+.eph-badge.g{background:var(--teal-bg);color:var(--teal)}.eph-badge.y{background:var(--amber-bg);color:var(--amber)}.eph-badge.r{background:var(--red-bg);color:var(--red)}
+.minibar{height:6px;background:#f0ede8;border-radius:3px;overflow:hidden;min-width:80px}.minibar-f{height:100%;border-radius:3px}
+.s-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700}
+.s-badge.kp{background:var(--red-bg);color:var(--red)}.s-badge.ke{background:rgba(224,122,95,.1);color:var(--ergo)}.s-badge.pf{background:var(--teal-bg);color:var(--teal)}
+/* ===== Club · Gespraeche aus MyWellness ===== */
+.mw-box{margin:14px 0 18px}
+.mw-box:empty{display:none}
+.mw-kopf{font-size:15px;margin-bottom:8px}
+.mw-kopf small{color:#6b7785;font-weight:400;margin-left:6px}
+.mw-quote{display:flex;align-items:baseline;gap:12px;margin:10px 0 6px}
+.mw-q-zahl{font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1}
+.mw-q-txt{font-size:13.5px;color:#6b7785}
+.mw-wahl{font-size:12px;color:#6b7785;margin:8px 0 14px;display:flex;gap:6px;
+  flex-wrap:wrap;align-items:center}
+.mw-tab{width:100%;border-collapse:collapse;font-size:13.5px}
+.mw-tab td{padding:5px 8px;border-bottom:1px solid #eceff2;vertical-align:middle}
+.mw-tab tr.ab td{font-weight:650}
+.mw-bal{width:45%}
+.mw-bal span{display:block;height:9px;border-radius:5px;background:#d7dde3}
+.mw-tab tr.ab .mw-bal span{background:#1d7a4e}
+.mw-n{text-align:right;width:46px;font-variant-numeric:tabular-nums}
+.mw-p{text-align:right;width:62px;color:#6b7785;font-variant-numeric:tabular-nums}
+.mw-trich .mw-bal span{background:#1d7a4e}
+.mw-pkt{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px}
+.mw-pfeil{color:#95a1ad;margin:0 3px}
+.mw-heute{background:#f5f3f2;border:1px solid #e6e2e0;border-radius:12px;
+  padding:14px 16px;margin-bottom:16px}
+.mw-h-kopf{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+  color:#6b7785;margin-bottom:8px}
+.mw-h-zeile{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px}
+.mw-h-st{font-size:14px;color:#6b7785}
+.mw-h-st b{font-size:22px;color:#020101;margin-right:4px;font-variant-numeric:tabular-nums}
+.mw-h-leer{font-size:13.5px;color:#6b7785}
+.mw-h-tab td{border-bottom:1px solid #e6e2e0}
+.mw-wo{font-size:12px;color:#6b7785;text-align:right}
+.mw-tun{font-size:13px;background:#fbeceb;color:#c03b35;border-radius:10px;
+  padding:11px 14px;margin:10px 0 2px;line-height:1.5}
+/* ===== Club · Therapiemanager ===== */
+.cl-nav-l{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cl-nav-l input[type=date]{font-family:'Poppins',sans-serif;font-size:13px;padding:6px 10px;border:2px solid var(--border);border-radius:10px}
+.cr-ort{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.cr-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.cr-tabs button{font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;padding:5px 12px;border-radius:100px;border:1.5px solid rgba(255,255,255,.6);background:transparent;color:#fff;cursor:pointer}
+.cr-tabs button.a{background:#fff;color:#020101}
+.cr-body{padding:18px 20px}
+.cr-body .cl-card{box-shadow:none;margin:-18px -20px}
+.re-kacheln{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.re-k{flex:1 1 120px;background:#f5f3f2;border-radius:12px;padding:12px 14px}
+.re-k b{display:block;font-size:26px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.re-k span{font-size:12px;color:#6b7785}
+.re-k.gut{background:#e8f4ee}.re-k.gut b{color:#1d7a4e}
+.re-k.rot{background:#fbeceb}.re-k.rot b{color:#c03b35}
+.re-kopf{font-size:13px;font-weight:800;letter-spacing:.4px;margin:18px 0 6px}
+.re-kopf small{font-weight:400;color:#6b7785;margin-left:6px;letter-spacing:0}
+.re-tab{width:100%;border-collapse:collapse;font-size:13px}
+.re-tab th{text-align:left;font-size:11px;color:#6b7785;font-weight:600;padding:4px 8px;border-bottom:1px solid #e6e2e0}
+.re-tab td{padding:6px 8px;border-bottom:1px solid #eceff2;vertical-align:top}
+.re-tab td.n{text-align:right;font-variant-numeric:tabular-nums}
+.re-rot td:first-child{border-left:3px solid #c03b35}
+.re-leise{color:#6b7785;font-size:12px}
+.re-weg{font-size:12.5px}
+.re-spaet{display:inline-block;font-size:11px;font-weight:600;color:#9a5b00;background:#fdf1dc;border-radius:6px;padding:1px 6px;margin-left:4px}
+.re-btn{font-family:'Poppins',sans-serif;font-size:11.5px;padding:3px 10px;border-radius:100px;border:1.5px solid var(--border);background:#fff;cursor:pointer;white-space:nowrap}
+.re-btn:hover{border-color:var(--red);color:var(--red)}
+.re-btn-a{border-color:var(--red);background:var(--red);color:#fff}
+.re-form td{background:#faf7f6}
+.re-form-in{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.re-form-in select,.re-form-in input{font-family:'Poppins',sans-serif;font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:8px}
+.re-form-in input{flex:1;min-width:200px}
+.re-notiz{font-size:12px;color:#4a5560;font-style:italic;margin:2px 0 4px 16px}
+.cl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.cl-head h3{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:800}
+.cl-per{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.cl-grid{display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:32px}
+.cl-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden}
+.cl-card-h{padding:14px 20px;color:#fff;font-family:'Montserrat',sans-serif;font-weight:800;font-size:14px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.cl-card-h.w{background:var(--red)}.cl-card-h.k{background:var(--teal)}
+.cl-card-h small{font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;opacity:.9}
+.cl-body{padding:16px 20px 20px}
+.cl-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px}
+.cl-tile{background:var(--bg);border-radius:14px;padding:10px 12px}
+.cl-tile .v{font-family:'Montserrat',sans-serif;font-size:22px;font-weight:900;line-height:1.2}
+.cl-tile .l{font-size:10px;color:var(--muted);line-height:1.3}
+.cl-tile.hl{background:var(--teal-bg)}.cl-tile.hl .v{color:var(--teal)}
+.cl-sub{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.cl-tw{overflow-x:auto}
+.cl-tw table{font-size:12px}.cl-tw td,.cl-tw th{padding:6px 8px;text-align:right}.cl-tw td:first-child,.cl-tw th:first-child{text-align:left}
+.cl-tw tbody tr{background:var(--bg)}
+.cl-tw .txt{color:var(--muted);font-size:11px;font-style:italic}
+.cl-tw .nt{color:var(--amber);font-weight:700;cursor:help}
+.cl-notes{font-size:11px;color:var(--muted);line-height:1.6}
+.cl-notes b{color:var(--dark);font-weight:600}
+/* ===== QM-Modul ===== */
+.qm-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.qm-count{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+.qm-badge{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:100px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;border:2px solid var(--border);background:#fff}
+.qm-badge.done{border-color:var(--teal);background:var(--teal-bg);color:var(--teal)}
+.qm-badge .qm-num{font-size:15px}
+.qm-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
+@media(max-width:900px){.qm-cols{grid-template-columns:1fr}}
+.qm-col{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden}
+.qm-col-h{padding:14px 20px;color:#fff;display:flex;align-items:center;justify-content:space-between;font-family:'Montserrat',sans-serif;font-weight:800;font-size:14px}
+.qm-col-h.bf{background:var(--red)}.qm-col-h.dk{background:var(--green)}
+.qm-col-h small{font-family:'Poppins',sans-serif;font-weight:500;font-size:11px;opacity:.85}
+.qm-list{padding:8px 12px 12px}
+.qm-item{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:14px;cursor:pointer;transition:background .15s;border:1.5px solid transparent}
+.qm-item:hover{background:var(--red-bg)}
+.qm-item.sugg{border-color:var(--border)}
+.qm-item.ok{opacity:.65;cursor:default}
+.qm-item.ok:hover{background:transparent}
+/* Termin ohne belegte Therapeuten-Zuordnung: nicht kontrollierbar, aber sichtbar */
+.qm-item.na{opacity:.45;cursor:not-allowed}
+.qm-item.na:hover{background:transparent}
+/* Doku: weitere Termine derselben Therapeut:in zur Auswahl */
+.qm-alt{font-size:11px;font-weight:700;color:var(--muted);padding:4px 10px;border:1px solid var(--border);border-radius:100px;white-space:nowrap;background:var(--card);cursor:pointer}
+.qm-alt:hover{color:var(--red);border-color:var(--red)}
+.qm-sub{margin:0 0 8px 28px;padding-left:8px;border-left:2px solid var(--border)}
+.qm-sub .qm-item{padding:6px 10px}
+.qm-note{margin:4px 6px 10px;padding:8px 12px;border-radius:12px;background:var(--amber-bg);color:var(--amber);font-size:11px;line-height:1.5;border:1px solid rgba(217,119,6,.2)}
+/* Zuteilung Therapeut:in -> fachliche Leitung */
+.qm-cfg-btn{border:1px solid var(--border);background:var(--card);color:var(--muted);font:inherit;font-size:12px;font-weight:700;padding:7px 14px;border-radius:100px;cursor:pointer}
+.qm-cfg-btn:hover{color:var(--red);border-color:var(--red)}
+.qm-who{margin:0 0 12px;padding:9px 16px;border-radius:14px;background:var(--teal-bg);color:var(--teal);font-size:12px;font-weight:600}
+.qm-cfg{margin:0 0 16px;padding:16px;border-radius:var(--radius);background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow)}
+.qm-cfg h4{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;margin:0 0 4px}
+.qm-cfg .hint{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+.qm-cfg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:6px}
+.qm-cfg-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:12px;background:var(--bg)}
+.qm-cfg-row .nm{flex:1;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qm-cfg-row button{border:1px solid var(--border);background:var(--card);color:var(--muted);font:inherit;font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;cursor:pointer}
+.qm-cfg-row button.a{background:var(--red);border-color:var(--red);color:#fff}
+.qm-cfg-sum{margin-top:12px;font-size:11px;color:var(--muted)}
+.qm-chk{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;background:#fff}
+.qm-item.ok .qm-chk{border-color:var(--teal);background:var(--teal-bg)}
+.qm-main{flex:1;min-width:0}
+.qm-t1{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qm-t2{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qm-tag{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:100px;background:var(--red-bg);color:var(--red);flex-shrink:0}
+.qm-score-pill{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;flex-shrink:0}
+.qm-more{text-align:center;padding:8px;font-size:11px;color:var(--muted);cursor:pointer;font-weight:600}
+.qm-more:hover{color:var(--red)}
+.qm-empty{padding:20px;text-align:center;color:var(--muted);font-size:12px}
+/* Modal */
+.qm-ov{position:fixed;inset:0;background:rgba(2,1,1,.45);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:4vh 16px;overflow-y:auto}
+.qm-ov.open{display:flex}
+.qm-modal{background:#fff;border-radius:var(--radius);max-width:640px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.25);overflow:hidden;margin-bottom:4vh}
+.qm-m-h{padding:20px 26px;color:#fff}
+.qm-m-h.bf{background:var(--red)}.qm-m-h.dk{background:var(--green)}
+.qm-m-h h3{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:900;letter-spacing:-.01em}
+.qm-m-h p{font-size:12px;opacity:.9}
+.qm-m-b{padding:22px 26px}
+.qm-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:18px;padding:14px 16px;background:var(--bg);border-radius:14px;border:1px solid var(--border)}
+.qm-meta div{font-size:12px}.qm-meta b{font-weight:600}
+.qm-meta .lbl{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700;font-family:'Montserrat',sans-serif;display:block}
+.qm-q{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #f5f3f0}
+.qm-q:last-of-type{border-bottom:none}
+.qm-q-t{font-size:13px;font-weight:600;margin-bottom:8px}
+.qm-opts{display:flex;gap:6px;flex-wrap:wrap}
+.qm-opt{padding:7px 16px;border-radius:100px;border:2px solid var(--border);background:#fff;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .15s}
+.qm-opt:hover{border-color:var(--red);color:var(--red)}
+.qm-opt.sel{border-color:var(--red);background:var(--red-bg);color:var(--red);font-weight:600}
+.qm-note{width:100%;border:2px solid var(--border);border-radius:14px;padding:10px 14px;font-family:'Poppins',sans-serif;font-size:12.5px;resize:vertical;min-height:60px;outline:none}
+.qm-note:focus{border-color:var(--red)}
+.qm-live{display:flex;align-items:center;justify-content:space-between;margin:16px 0;padding:12px 16px;border-radius:14px;background:var(--bg);border:1px solid var(--border)}
+.qm-live b{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:900}
+.qm-m-f{display:flex;gap:10px;padding:0 26px 24px}
+.qm-btn{flex:1;padding:13px;border:none;border-radius:100px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s}
+.qm-btn.pri{background:var(--red);color:#fff}.qm-btn.pri:hover{background:#a3302c}
+.qm-btn.pri:disabled{background:#ddd;cursor:not-allowed}
+.qm-btn.sec{background:#fff;color:var(--muted);border:2px solid var(--border)}.qm-btn.sec:hover{border-color:var(--muted)}
+/* Auswertung */
+.qm-an-flt{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.qm-team-line{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;padding:16px 20px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow)}
+.qm-tl-item .lbl{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700;font-family:'Montserrat',sans-serif}
+.qm-tl-item .val{font-family:'Montserrat',sans-serif;font-size:20px;font-weight:900}
+.qm-trend{font-size:13px;font-weight:800}
+.qm-hist-row{cursor:pointer}
+.qm-spark{display:inline-flex;align-items:flex-end;gap:2px;height:22px}
+.qm-spark i{width:6px;border-radius:2px;display:inline-block}
+.qm-detail{background:var(--bg);border-radius:14px;padding:12px 16px;margin:4px 0 8px}
+.qm-detail .dr{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap}
+.qm-detail .dr:last-child{border-bottom:none}
+@media(max-width:900px){.okr-grid,.ausl-cards{grid-template-columns:1fr}}
+@media(max-width:640px){#db{padding:16px 12px}.hdr h1{font-size:20px}.vision h2{font-size:18px}.okr-head{padding:16px}.okr-body{padding:16px}.fp{padding:6px 14px;font-size:11px}}
+</style>
+</head>
+<body>
+<div id="lo"><div class="lb"><h1>BM Group</h1><p>OKR Dashboard · Verantwortung</p><button class="l-btn" onclick="signIn()"><svg viewBox="0 0 21 21" width="20" height="20"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>Mit Microsoft anmelden</button><div class="l-err" id="er"></div></div></div>
+<div class="loading h" id="ld"><div class="spinner"></div><p id="lt">Lade...</p></div>
+<div id="db"><div class="mx">
+<div class="topbar"><div class="tb-in">
+<div class="tb-row">
+<span class="tb-brand">BM</span>
+<div class="tb-tabs">
+<span class="tb-tab a" data-t="therapie" onclick="setTab('therapie')"><span class="ti">🎯</span>Therapie</span>
+<span class="tb-tab" data-t="pm" onclick="setTab('pm')"><span class="ti">🏥</span>Praxismanagement</span>
+<span class="tb-tab" data-t="club" onclick="setTab('club')"><span class="ti">🏋️</span>Club</span>
+<span class="tb-tab" data-t="vw" onclick="setTab('vw')"><span class="ti">🏢</span>Verwaltung</span>
+<span class="tb-tab" data-t="ausl" onclick="setTab('ausl')"><span class="ti">📊</span>Auslastung</span>
+<span class="tb-tab" data-t="fb" onclick="setTab('fb')"><span class="ti">💬</span>Bewertungen</span>
+<span class="tb-tab" data-t="th" onclick="setTab('th')"><span class="ti">💶</span>€/Stunde</span>
+</div>
+<div class="tb-regs">
+<span class="tb-reg a" data-r="Allgemein" onclick="setReg('Allgemein')">Allgemein</span>
+<span class="tb-reg" data-r="Kitzingen" onclick="setReg('Kitzingen')">Kitzingen</span>
+<span class="tb-reg" data-r="Werneck" onclick="setReg('Werneck')">Werneck</span>
+</div>
+</div>
+</div></div>
+<div class="hdr"><h1><span>BM Group</span> OKR Dashboard</h1><div class="hdr-r"><button class="hdr-btn" onclick="signOut()">Abmelden</button></div></div>
+<div class="vision"><h2>Wir erschaffen gesunde Lebensjahre.</h2><p>OKR Übersicht 2026</p></div>
+<div class="flt" id="fltDiv"></div>
+<div id="regHint"></div>
+<div class="tabsec act" id="tab-therapie">
+<div class="st">🎯 Therapie</div><div class="okr-grid" id="okrT"></div>
+<div class="st">✅ QM-Kontrollen · Befund &amp; Doku</div>
+<div class="qm-head">
+  <button class="nav-btn" onclick="qmChW(-1)">←</button><h3 id="qmKwT" style="font-family:'Montserrat',sans-serif;font-size:16px;font-weight:800"></h3><button class="nav-btn" onclick="qmChW(1)">→</button>
+  <span id="qmKwI" style="font-size:12px;color:var(--muted)"></span>
+  <div class="qm-count">
+    <span class="qm-badge" id="qmCntB">📋 Befunde <span class="qm-num">0/5</span></span>
+    <span class="qm-badge" id="qmCntD">📝 Dokus <span class="qm-num">0/5</span></span>
+    <button class="qm-cfg-btn" onclick="QM.cfgOpen=!QM.cfgOpen;rQM()">⚙️ Zuteilung</button>
+  </div>
+</div>
+<div id="qmWho"></div>
+<div id="qmCfg"></div>
+<div class="qm-cols">
+  <div class="qm-col"><div class="qm-col-h bf">📋 Befund-Kontrollen <small>Ersttermine der Woche</small></div><div class="qm-list" id="qmListB"></div></div>
+  <div class="qm-col"><div class="qm-col-h dk">📝 Doku-Kontrollen <small>Vorschlag je Therapeut:in · weitere Termine wählbar</small></div><div class="qm-list" id="qmListD"></div></div>
+</div>
+<div class="st" style="font-size:15px;margin-top:8px">📈 QM-Auswertung · Historie pro Therapeut:in</div>
+<div class="qm-an-flt" id="qmAnFlt"></div>
+<div class="qm-team-line" id="qmTeamLine"></div>
+<div style="background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:32px;overflow-x:auto">
+<table><thead><tr><th>Therapeut:in</th><th style="text-align:center">Kontrollen</th><th style="text-align:right">ø Befund</th><th style="text-align:right">ø Doku</th><th>Verlauf</th><th>Trend</th><th>Letzte</th></tr></thead><tbody id="qmAnTb"></tbody></table>
+</div>
+</div>
+<div class="tabsec" id="tab-pm">
+<div class="st">🏥 Praxismanagement</div><div class="okr-grid" id="okrP"></div>
+</div>
+<div class="tabsec" id="tab-club">
+<div class="st">🏋️ Club · Therapiemanager</div>
+<div class="cl-head" id="clNav"></div>
+<div class="cl-grid" id="clD"></div>
+</div>
+<div class="tabsec" id="tab-vw">
+<div class="st">🏢 Verwaltung</div><div class="okr-grid" id="okrV"></div>
+</div>
+<div class="tabsec" id="tab-ausl">
+<div class="st">📊 Auslastung</div>
+<div class="ausl-nav"><button class="nav-btn" onclick="chKW(-1)">←</button><h3 id="kwT"></h3><button class="nav-btn" onclick="chKW(1)">→</button><span id="kwI" style="font-size:12px;color:var(--muted)"></span></div>
+<div class="ausl-cards" id="auslD"></div>
+</div>
+<div class="tabsec" id="tab-fb">
+<div class="st">💬 Letzte Patientenbewertungen</div>
+<div class="fb-grid" id="fbD"></div>
+</div>
+<div class="tabsec" id="tab-th">
+<div class="st">💶 Therapeuten · €/Stunde</div>
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center" id="thFlt"></div>
+<div style="background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:32px;overflow-x:auto">
+<table><thead><tr><th>Therapeut:in</th><th>Team</th><th>Standort</th><th style="text-align:right">€/Stunde</th><th style="min-width:100px"></th></tr></thead><tbody id="thTb"></tbody></table>
+</div>
+</div>
+<div class="qm-ov" id="qmOv"><div class="qm-modal" id="qmModal"></div></div>
+<div class="ft">BM Group · OKR Dashboard · 2026</div>
+</div></div>
+<script>
+const MC={auth:{clientId:"9fe9cda7-79c3-4d06-82dc-372715bb8086",authority:"https://login.microsoftonline.com/3e5c8d47-8ccc-42f6-877d-0d0e72972e39",redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}};
+const LR={scopes:["Files.Read","Files.ReadWrite","Sites.Read.All"]};const ml=new msal.PublicClientApplication(MC);
+const SI={k:{h:'kimojophysiotherapie.sharepoint.com',p:'/sites/KIMOJOManagement'},p:{h:'kimojophysiotherapie.sharepoint.com',p:'/sites/PfFiP-TeamPortal'},pm:{h:'kimojophysiotherapie.sharepoint.com',p:'/sites/KIMOJOPraxismanagement'}};
+const FI={kpi:'a9b8cad6-e1bd-414d-8aaf-503a0e18822f',kpiP:'770759B1-D4F0-48A1-804B-7EB765D00E5F',fb:'B908259A-055F-4074-8905-81B5158B091D',
+  bwaK:'EEE9DBB4-A663-4A58-9E80-0E155B44D938',bwaP:'09CE1ACC-AE3C-4A0A-A7B6-FFFE6FB22C04',
+  m1:'7BB83665-B91D-4E99-9FDB-E6CBA0496721',m2:'C7C25E25-8770-4123-B0F0-39B550252905',m3:'C3F9A7D3-452D-4ED5-8C3B-602BB7910A2F',m4:'6230A887-EE13-4FA7-86DA-C1FDBEE62B5F',
+  nps:'BDA9462C-ABE2-46C7-814F-B21EEF94531B',ks:'F0E4C01E-14F3-4FF2-9380-329672BEEEB4'};
+let dr={},D={kpiK:null,kpiP:null,auslK:[],auslP:[],fb:[],teams:[],raw:[],medRaw:[],bwaK:{},bwaP:{},nps:[],ks:{byMA:[],tageWoche:{}}},sKW=0,aF='Alle',aM='YTD';
+// Top-Leiste: aktiver Reiter + Region (Allgemein = alles, Kitzingen = Medifox-Standorte, Werneck = thevea)
+let TAB='therapie',REG='Allgemein';
+function setTab(id){TAB=id;document.querySelectorAll('.tabsec').forEach(e=>e.classList.toggle('act',e.id==='tab-'+id));document.querySelectorAll('.tb-tab').forEach(b=>b.classList.toggle('a',b.dataset.t===id));window.scrollTo({top:0,behavior:'smooth'});}
+function setReg(r){REG=r;document.querySelectorAll('.tb-reg').forEach(b=>b.classList.toggle('a',b.dataset.r===r));aF='Alle';render();}
+const MN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+// Stunden pro Monat = Wochenstunden × 4,33 (analog Controlling Dashboard)
+function getWhM(t,months){let tot=0;months.forEach(m=>{const wh=t.mh&&t.mh[m]?t.mh[m]:(t.wh||0);tot+=wh*4.33;});return tot;}
+const manualState=JSON.parse(localStorage.getItem('okrManual')||'{}');
+
+async function signIn(){try{document.getElementById('er').style.display='none';const r=await ml.loginPopup(LR);ml.setActiveAccount(r.account);await loadAll();}catch(e){document.getElementById('er').textContent=e.message;document.getElementById('er').style.display='block';}}
+function signOut(){ml.logoutPopup();document.getElementById('db').style.display='none';document.getElementById('lo').style.display='flex';}
+async function gTk(){const a=ml.getActiveAccount();try{return(await ml.acquireTokenSilent({...LR,account:a})).accessToken;}catch(e){return(await ml.acquireTokenPopup(LR)).accessToken;}}
+ml.initialize().then(async()=>{const a=ml.getAllAccounts();if(a.length>0){ml.setActiveAccount(a[0]);await loadAll();}});
+const gq=u=>fetch(u,{headers:{Authorization:'Bearer '+window._tk}}).then(r=>r.ok?r.json():null);
+async function gS(d,f,n){const r=await gq(`https://graph.microsoft.com/v1.0/drives/${d}/items/${f}/workbook/worksheets('${encodeURIComponent(n)}')/usedRange`);return r?r.values:null;}
+async function gSN(d,f){const r=await gq(`https://graph.microsoft.com/v1.0/drives/${d}/items/${f}/workbook/worksheets`);return r?r.value.map(s=>s.name):[];}
+async function rDr(k){const s=SI[k];const site=await gq(`https://graph.microsoft.com/v1.0/sites/${s.h}:${s.p}`);if(!site)return null;const d=await gq(`https://graph.microsoft.com/v1.0/sites/${site.id}/drive`);return d?d.id:null;}
+function cKW(){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+3-(d.getDay()+6)%7);const w=new Date(d.getFullYear(),0,4);return 1+Math.round(((d.getTime()-w.getTime())/864e5-3+(w.getDay()+6)%7)/7);}
+
+// PARSERS
+function pAusl(data){const kR=data[2]||[],mR=data[1]||[],pS=data[19]||[];let eS=null;for(let i=21;i<Math.min(data.length,35);i++){if(data[i]&&data[i][0]&&String(data[i][0]).includes('Summe')){eS=data[i];break;}}const kws=[];let c=5,lP=null;while(c<kR.length){const kw=kR[c];if(kw&&typeof kw==='number'&&kw>0&&kw<53){const ac=c+2,pv=pS[ac],ev=eS?eS[ac]:null,mo=String(mR[c]||'');if(pv&&typeof pv==='number'&&pv>0&&pv<=1.5){const pp=Math.round(pv*1000)/10;if(lP!==null&&Math.abs(pp-lP)<0.01)break;lP=pp;kws.push({kw:Math.round(kw),physio:pp,ergo:(ev&&typeof ev==='number'&&ev>0&&ev<=1.5)?Math.round(ev*1000)/10:null,month:mo});}c+=4;}else c++;}return kws;}
+function pKPI(data){const res={};if(!data||data.length<5)return res;let hi=-1;for(let i=0;i<Math.min(6,data.length);i++){if(String(data[i][0]||'').trim()==='Monat'){hi=i;break;}}if(hi<0)return res;for(let i=hi+1;i<Math.min(hi+13,data.length);i++){const m=String(data[i][0]||'').trim();if(!m||m==='Ø Jahr')continue;const ts=[];for(let c=1;c<data[i].length-2;c+=2){const b=parseFloat(data[i][c])||0;const d=parseFloat(data[i][c+1])||0;ts.push({b,d});}const bs=ts.map(t=>t.b).filter(v=>v>0),ds=ts.map(t=>t.d).filter(v=>v>0);if(bs.length||ds.length)res[m]={befund:bs.length?bs.reduce((a,b)=>a+b,0)/bs.length:0,doku:ds.length?ds.reduce((a,b)=>a+b,0)/ds.length:0};}return res;}
+function pFB(data){if(!data||data.length<2)return[];return data.slice(1).map(r=>{const s=r[1],t=r[5]||'',st=parseFloat(r[6])||0,n=r[7]||'';let d=null;if(typeof s==='number'&&s>40000)d=new Date((s-25569)*864e5);else if(s)try{d=new Date(s);}catch(e){}return{date:d,text:String(t),stars:st,name:String(n)};}).filter(f=>f.date&&!isNaN(f.date));}
+function pRaw(rows){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i],nm=r[0],pr=parseFloat(r[7])||0;if(!nm||pr<=0)continue;let mo=null;const dv=r[1];if(typeof dv==='number'&&dv>40000){mo=new Date(Math.round((dv-25569)*864e5)).getUTCMonth()+1;}else{const s=String(dv),m=s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);if(m)mo=parseInt(m[2]);else{const m2=s.match(/(\d{4})-(\d{2})-(\d{2})/);if(m2)mo=parseInt(m2[2]);}}d.push({name:String(nm).replace(/\s*\((?:Physio|Ergo)\s*(?:-\s*)?#\d+\)\s*/g,'').replace(/\s+/g,' ').trim(),mo,pr});}return d;}
+function pMedFull(rows,standort){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i];if(!r||!r[0])continue;const pat=r[4]||'';const abr=String(r[8]||'').toUpperCase();let dt=null;const dv=r[1];if(typeof dv==='number'&&dv>40000)dt=new Date((dv-25569)*864e5);else{const s=String(dv||''),m=s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);if(m)dt=new Date(parseInt(m[3]<100?2000+parseInt(m[3]):m[3]),parseInt(m[2])-1,parseInt(m[1]));}if(!pat||!dt)continue;d.push({pat,dt,open:abr!=='WAHR'&&abr!=='TRUE'&&abr!=='1',standort});}return d;}
+// QM: Termine inkl. Rezeptnummer aus dem Praxissoftware-Export (gleiche Dateien, mehr Spalten)
+function pQMT(rows,standort){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i];if(!r||!r[0])continue;const pat=String(r[4]||'').trim(),pos=String(r[5]||'').trim(),lst=String(r[6]||'').trim();let dt=null;const dv=r[1];if(typeof dv==='number'&&dv>40000)dt=new Date(Math.round((dv-25569)*864e5));else{const s=String(dv||''),m=s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);if(m)dt=new Date(parseInt(m[3])<100?2000+parseInt(m[3]):parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}if(!pat||!dt||isNaN(dt))continue;if(/ausfall/i.test(lst))continue;const th=String(r[0]).replace(/\s*\((?:Physio|Ergo)\s*(?:-\s*)?#\d+\)\s*/g,'').replace(/\s+/g,' ').trim();d.push({th,dt,uz:String(r[2]||''),pat,pos,lst,standort});}return d;}
+// --- QM v3: Helper ---
+function qmDayKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function qmHM(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function cleanTh(s){return String(s||'').replace(/\s*\(.*?\)\s*/g,' ').replace(/\s+/g,' ').trim();}
+const HIST_ABGESAGT=/ABGESAGT|ABSAGE|STORN|AUSGEFALLEN|ENTFALLEN|NICHT.?ERSCHIENEN|GEL[OÖ]SCHT|CANCEL/i;
+/* Der Historien-Export liefert den Mitarbeiter seit 01.10.2026 direkt mit
+   (mitarbeiter.person, Zeitraum -180 bis +270 Tage). Faellt das Feld weg, bleibt
+   die Zuordnung leer statt geraten - QMHIST.ohneMa macht das im UI sichtbar. */
+const QMHIST={n:0,ohneMa:0};
+// QM Werneck (thevea): terminplan_*_wp/_we (14 Tage voraus, mit Mitarbeiter) + termine_historie_wp/we
+// (volle Historie je Verordnung, ebenfalls mit Mitarbeiter) + Verordnungsübersicht (Patientennamen).
+// Ersttermin = frühester Tag je VerordnungId über Historie ∪ Terminplan → kein Fensterschutz nötig.
+function pWerneckQMT(tp,hist,vo,label){
+  // pidMap: Patientenname je PatientId – exakter ID-Abgleich, keine Namensheuristik
+  const voMap={},pidMap={};(Array.isArray(vo)?vo:[]).forEach(v=>{if(!v||!v.id)return;
+    const pat=(((v.nachname||'')+', '+(v.vorname||'')).replace(/^,\s*|,\s*$/g,'').trim());
+    voMap[v.id]={pat:pat||null,hm:String(v.heilmittel||'')};
+    if(pat&&v.verknuepfterPatientId)pidMap[v.verknuepfterPatientId]=pat;});
+  // Terminplan nennt den Patienten direkt – gilt per PatientId auch fuer dessen Termine ohne (gelistete) Verordnung
+  (Array.isArray(tp)?tp:[]).forEach(t=>{if(!t||!t.PatientId)return;
+    const pat=(((t.PatientNachname||'')+', '+(t.PatientVorname||'')).replace(/^,\s*|,\s*$/g,'').trim());
+    if(pat)pidMap[t.PatientId]=pat;});
+  const minVo={},seen=new Set(),recs=[];
+  const noteMin=(vid,dk)=>{if(vid&&(!minVo[vid]||dk<minVo[vid]))minVo[vid]=dk;};
+  (Array.isArray(tp)?tp:[]).forEach(t=>{
+    if(!t||!t.Beginn)return;
+    if(!(t.PatientId||t.Art===1||t.Art===4))return;
+    if(t.Status===8)return;
+    const x=new Date(t.Beginn);if(isNaN(x.getTime()))return;
+    const dk=qmDayKey(x),vid=t.VerordnungId||null;
+    const m=(t.Mitarbeiter&&t.Mitarbeiter[0])||null;
+    const th=m?cleanTh((m.Nachname||'')+', '+(m.Vorname||'')):'—';
+    noteMin(vid,dk);
+    const key=(t.PatientId||'?')+'|'+dk+'|'+qmHM(x);
+    if(seen.has(key))return;seen.add(key);
+    const pat=(((t.PatientNachname||'')+', '+(t.PatientVorname||'')).replace(/^,\s*|,\s*$/g,'').trim())||(vid&&voMap[vid]&&voMap[vid].pat)||pidMap[t.PatientId]||('Patient #'+(t.PatientId||'?'));
+    recs.push({th,dt:new Date(x.getFullYear(),x.getMonth(),x.getDate()),uz:qmHM(x),pat,
+      pos:vid?('W'+vid):('W?'+key),lst:String(t.Bezeichnung||t.Heilmittel||(vid&&voMap[vid]&&voMap[vid].hm)||''),
+      standort:label,region:'Werneck',erst:false,vid,pid:t.PatientId||null});
+  });
+  (Array.isArray(hist)?hist:[]).forEach(n=>{
+    if(!n||n.__typename&&n.__typename!=='PatientenTermin')return;
+    if(!n.from)return;
+    if(n.status&&HIST_ABGESAGT.test(String(n.status)))return;
+    const x=new Date(n.from);if(isNaN(x.getTime()))return;
+    const dk=qmDayKey(x);
+    const key=(n.patientId||'?')+'|'+dk+'|'+qmHM(x);
+    if(seen.has(key))return;seen.add(key);
+    // Mitarbeiter kommt aus dem Termin selbst - keine Rueckprojektion des heute
+    // zugeordneten Therapeuten auf Alttermine.
+    const p=(n.mitarbeiter&&n.mitarbeiter.person)||null;
+    QMHIST.n++;if(!p)QMHIST.ohneMa++;
+    const vid=(n.terminVerordnung&&n.terminVerordnung.id)||null;
+    noteMin(vid,dk);
+    const th=p?cleanTh((p.nachname||'')+', '+(p.vorname||'')):'—';
+    const pat=(vid&&voMap[vid]&&voMap[vid].pat)||pidMap[n.patientId]||('Patient #'+(n.patientId||'?'));
+    recs.push({th,dt:new Date(x.getFullYear(),x.getMonth(),x.getDate()),uz:qmHM(x),pat,
+      pos:vid?('W'+vid):('W?'+key),lst:(vid&&voMap[vid]&&voMap[vid].hm)||'',
+      standort:label,region:'Werneck',erst:false,vid,pid:n.patientId||null});
+  });
+  // Ersttermin-Flag: frühester Tag je Verordnung; bei mehreren Slots am selben Tag nur der früheste
+  const first={};recs.forEach(r=>{if(!r.vid)return;if(qmDayKey(r.dt)!==minVo[r.vid])return;
+    if(!first[r.vid]||r.uz<first[r.vid].uz)first[r.vid]=r;});
+  Object.values(first).forEach(r=>{r.erst=true;});
+  return recs;
+}
+// QM Kitzingen (Medifox-Wochenkalender terminplan_woche_f4.json): ALLE Kalender inkl. Ergo.
+// Art 1/4 = Patiententermin, Status 8 = abgesagt, Position === 1 = sicherer Ersttermin.
+function pKitzF4(woche){
+  if(!woche||typeof woche!=='object')return[];
+  const seen=new Set(),recs=[];
+  Object.values(woche).forEach(day=>{
+    if(!Array.isArray(day))return;
+    day.forEach(t=>{
+      if(!t||t.Id==null||seen.has(t.Id))return;seen.add(t.Id);
+      if(!(t.Art===1||t.Art===4))return;
+      if(!t.PatientId)return;
+      if(t.Status===8)return;
+      if(!t.Beginn)return;
+      const x=new Date(t.Beginn);if(isNaN(x.getTime()))return;
+      const m=(t.Mitarbeiter&&t.Mitarbeiter[0])||null;
+      const th=m?cleanTh((m.Nachname||'')+', '+(m.Vorname||'')):'—';
+      const pat=(((t.PatientNachname||'')+', '+(t.PatientVorname||'')).replace(/^,\s*|,\s*$/g,'').trim())||('Patient #'+t.PatientId);
+      recs.push({th,dt:new Date(x.getFullYear(),x.getMonth(),x.getDate()),uz:qmHM(x),pat,
+        pos:t.VerordnungId?('F4-'+t.VerordnungId):('F4?'+t.Id),lst:String(t.Bezeichnung||t.Heilmittel||''),
+        standort:'Kitzingen',region:'Kitzingen',erst:t.Position===1});
+    });
+  });
+  return recs;
+}
+function pBWA(rows){const d={umsatz:0,kosten:0,ergebnis:0};for(const r of rows){const z=String(r[0]||'').trim();const v=parseFloat(r[3])||0;if(z==='1006')d.umsatz=v;if(z==='1294')d.kosten=v;if(z==='1374')d.ergebnis=v;}return d;}
+function pNPS(rows){
+  if(!rows||rows.length<2)return[];
+  const hdr=rows[0]||[];
+  // NPS-Spalte: letzte Spalte mit "wahrscheinlich" oder "empfehl" im Header
+  let npsCol=-1;
+  for(let i=hdr.length-1;i>=0;i--){const h=String(hdr[i]||'').toLowerCase();if(h.includes('wahrscheinlich')||h.includes('empfehl')||h.includes('weiterempf')){npsCol=i;break;}}
+  // Fallback: letzte Spalte mit numerischen Werten 0-10
+  if(npsCol<0){for(let i=hdr.length-1;i>=0;i--){let isNum=true,hasVal=false;for(let r=1;r<Math.min(rows.length,10);r++){const v=rows[r]&&rows[r][i];if(v==null||v==='')continue;const n=parseFloat(v);if(isNaN(n)||n<0||n>10){isNum=false;break;}hasVal=true;}if(isNum&&hasVal){npsCol=i;break;}}}
+  // Bereich-Spalte (Physio/Ergo)
+  let bCol=-1;
+  for(let i=0;i<hdr.length;i++){const h=String(hdr[i]||'').toLowerCase();if(h.includes('bereich')||h.includes('therap')||h.includes('abteil')||h.includes('behandl')){bCol=i;break;}}
+  // Datums-Spalte
+  let dCol=-1;
+  for(let i=0;i<hdr.length;i++){const h=String(hdr[i]||'').toLowerCase();if(h.includes('zeit')||h.includes('datum')||h==='completion time'||h==='start time'){dCol=i;break;}}
+  console.log('NPS parse: npsCol=',npsCol,'bereichCol=',bCol,'dateCol=',dCol,'header=',hdr);
+  return rows.slice(1).map(r=>{
+    if(!r)return null;
+    const n=parseFloat(r[npsCol]);if(isNaN(n))return null;
+    let dt=null;if(dCol>=0){const dv=r[dCol];if(typeof dv==='number'&&dv>40000)dt=new Date((dv-25569)*864e5);else if(dv){try{dt=new Date(dv);}catch(e){}}}
+    return{nps:n,bereich:String(r[bCol]||'').toLowerCase(),date:dt};
+  }).filter(Boolean);
+}
+function normN(n){n=String(n).trim();if(n.includes(',')){const p=n.split(',');return(p[0].trim()+','+p[1].trim()).toLowerCase();}const p=n.split(/\s+/);if(p.length>=2)return(p[p.length-1]+','+p.slice(0,-1).join(' ')).toLowerCase();return n.toLowerCase();}
+let nMap={};function buildNM(){nMap={};const tn={};D.teams.forEach(t=>{tn[normN(t.n)]=t.n;});
+  const rawNames=new Set(D.raw.map(r=>r.name));
+  rawNames.forEach(rn=>{
+    const nm=normN(rn);
+    if(tn[nm]){nMap[rn]=tn[nm];return;}
+    // Fuzzy: match by surname (first part before comma)
+    const parts=rn.split(/[,\s]+/).filter(p=>p.length>2);
+    for(const[tnorm,tname] of Object.entries(tn)){
+      if(parts.length>=2&&parts.filter(p=>tnorm.includes(p.toLowerCase())).length>=2){nMap[rn]=tname;return;}
+    }
+    // Single part match (surname only)
+    if(parts.length>=1){
+      for(const[tnorm,tname] of Object.entries(tn)){
+        const surname=parts[0].toLowerCase();
+        if(tnorm.startsWith(surname+',')){nMap[rn]=tname;return;}
+      }
+    }
+  });
+  console.log('Name mappings:',Object.entries(nMap).filter(([k,v])=>k!==v).map(([k,v])=>`${k}->${v}`));
+}
+
+async function loadAll(){
+  const ld=document.getElementById('ld'),lt=document.getElementById('lt');ld.classList.remove('h');document.getElementById('lo').style.display='none';
+  try{
+    lt.textContent='Verbinde...';window._tk=await gTk();
+    lt.textContent='Lade Daten parallel...';
+    // Drives parallel
+    const [dk,dp,dpm]=await Promise.all([rDr('k'),rDr('p').catch(()=>null),rDr('pm').catch(()=>null)]);
+    dr.k=dk;dr.p=dp;dr.pm=dpm;
+    if(!dr.k){lt.textContent='SharePoint nicht erreichbar';return;}
+    // Alle Sheet-Loads parallel starten (Sheet-Namen sind bekannt → kein gSN nötig)
+    const teamsP=gS(dr.k,FI.kpi,'Teams').catch(()=>null);
+    const kpiKP=gS(dr.k,FI.kpi,'KPI Tracking Therapie').catch(()=>null);
+    const kpiPP=dr.p?gS(dr.p,FI.kpiP,'KPI Tracking Therapie').catch(()=>null):Promise.resolve(null);
+    // Club: Blatt "Therapiemanger" (so geschrieben) in beiden Trackern – Name per Muster suchen, falls es korrigiert wird
+    const clubLoad=(d,f)=>d?gSN(d,f).then(sn=>{const n=sn.find(x=>/therapiemana?ger/i.test(x));return n?gS(d,f,n):null;}).catch(()=>null):Promise.resolve(null);
+    const clubKP=clubLoad(dr.k,FI.kpi),clubPP=clubLoad(dr.p,FI.kpiP);
+    const auslKP=gS(dr.k,FI.kpi,'Auslastung').catch(()=>null);
+    const auslPP=dr.p?gS(dr.p,FI.kpiP,'Auslastung').catch(()=>null):Promise.resolve(null);
+    const fbP=gS(dr.k,FI.fb,'Sheet1').catch(()=>null);
+    // NPS-Umfrage (KIMOJO Werneck): Sheet-Name unbekannt → über gSN ermitteln
+    const npsP=dr.pm?gSN(dr.pm,FI.nps).then(sn=>sn&&sn.length?gS(dr.pm,FI.nps,sn[0]):null).catch(()=>null):Promise.resolve(null);
+    // Krankenstand (analog Controlling Dashboard)
+    const ksExpP=gS(dr.k,FI.ks,'Export').catch(()=>null);
+    const ksTwP=gS(dr.k,FI.ks,'TageWoche').catch(()=>null);
+    // Medifox: nur 1× pro File laden (statt 2×), Sheet heißt 'Export'
+    const medSrc=[{f:FI.m1,s:'KIMOJO'},{f:FI.m2,s:'KIMOJO'},{f:FI.m3,s:'KIMOJO'},{f:FI.m4,s:'PHFIP'}];
+    const medP=Promise.all(medSrc.map(m=>gS(dr.k,m.f,'Export').then(d=>({d,s:m.s})).catch(()=>({d:null,s:m.s}))));
+    // BWA: gSN + alle Sheets parallel
+    const bwaLoad=(fileId)=>gSN(dr.k,fileId).then(async sn=>{
+      const res=await Promise.all(sn.map(s=>gS(dr.k,fileId,s).then(d=>({s,d})).catch(()=>({s,d:null}))));
+      const out={};res.forEach(({s,d})=>{if(d)out[s]=pBWA(d);});return out;
+    }).catch(()=>({}));
+    const bwaKP=bwaLoad(FI.bwaK),bwaPP=bwaLoad(FI.bwaP);
+    // QM-Termindaten aus den JSON-Exporten der Power-Automate-Flows:
+    //  - Werneck (thevea): Patientenchecker-Exporte, _wp = Physio, _we = Ergo
+    //  - Kitzingen (Medifox): Controlling/terminplan_woche_f4.json (F4 = Kitzingen, ALLE Kalender inkl. Ergo)
+    const jGet=path=>{const e=path.split('/').filter(s=>s).map(encodeURIComponent).join('/');
+      return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/content`,{cache:'no-store',headers:{Authorization:'Bearer '+window._tk}})
+        .then(r=>r.ok?r.text():null).then(t=>t?JSON.parse(t.replace(/^\uFEFF/,'')):null).catch(()=>null);};
+    const WBASE='12_Code/Patientenchecker/Dateien Export/',CBASE='12_Code/Controlling/';
+    const W_DAYS=['heute','morgen','t2','t3','t4','t5','t6','t7','t8','t9','t10','t11','t12','t13'];
+    // Mitarbeiter kommt aus dem Flow normalerweise als Liste, zeitweise als
+    // Text ("[{\"Id\":…}]"). Hier einheitlich zur Liste machen.
+    const maListe=arr=>{arr.forEach(x=>{if(x&&typeof x.Mitarbeiter==='string'){try{const m=JSON.parse(x.Mitarbeiter);x.Mitarbeiter=Array.isArray(m)?m:[];}catch(e){x.Mitarbeiter=[];}}});return arr;};
+    const wTpP=suf=>Promise.all(W_DAYS.map(d=>jGet(WBASE+'terminplan_'+d+suf+'.json')))
+      .then(a=>maListe(a.filter(Array.isArray).reduce((x,y)=>x.concat(y),[])));
+    const wpTpP=wTpP('_wp'),weTpP=wTpP('_we');
+    const unwrapH=h=>{const d=h&&h.data&&h.data.termine;return Array.isArray(d)?d:(d&&Array.isArray(d.nodes)?d.nodes:[]);};
+    const unwrapV=v=>{const n=v&&v.data&&v.data.verordnungUebersicht&&v.data.verordnungUebersicht.nodes;return Array.isArray(n)?n:(Array.isArray(v)?v:[]);};
+    const wpHiP=jGet(WBASE+'termine_historie_wp.json'),weHiP=jGet(WBASE+'termine_historie_we.json');
+    const wpVoP=jGet(WBASE+'Verordnungsuebersicht.json'),weVoP=jGet(WBASE+'vo_uebersicht_we.json');
+    const f4P=jGet(CBASE+'terminplan_woche_f4.json');
+    // MyWellness: je Standort ein Unterordner, darin die Exporte. Gelesen wird
+    // der ganze Ordner — wer eine neue Datei ablegt, muss nichts weiter tun.
+    // Der Dateiname traegt die Gespraechsstufe, der Ordnername den Standort.
+    const tGet=path=>{const e=path.split('/').filter(s=>s).map(encodeURIComponent).join('/');
+      return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/content`,{cache:'no-store',headers:{Authorization:'Bearer '+window._tk}})
+        .then(r=>r.ok?r.text():null).catch(()=>null);};
+    const kinder=path=>{const e=path.split('/').filter(s=>s).map(encodeURIComponent).join('/');
+      return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/children?$top=200`,{cache:'no-store',headers:{Authorization:'Bearer '+window._tk}})
+        .then(r=>r.ok?r.json():null).then(j=>(j&&j.value)||[]).catch(()=>[]);};
+    const mwP=(async()=>{
+      const orte=await kinder(MW_DIR);
+      const ordner=orte.filter(x=>x.folder);
+      // Ohne Unterordner: Dateien direkt im Ordner, dann ohne Standortangabe.
+      const quellen=ordner.length?ordner.map(o=>({ort:o.name,pfad:MW_DIR+o.name+'/'}))
+                                  :[{ort:'',pfad:MW_DIR}];
+      const alle=[];
+      for(const q of quellen){
+        const dateien=(await kinder(q.pfad)).filter(x=>x.file&&/\.csv$/i.test(x.name));
+        const texte=await Promise.all(dateien.map(d=>tGet(q.pfad+d.name)));
+        dateien.forEach((d,i)=>{if(texte[i])alle.push(...pMW(texte[i],d.name,q.ort));});
+      }
+      // Anmerkungen: Der Flow holt sie fuer jede "Sonstige"-Antwort einzeln
+      // und legt je Gespraech eine kleine Datei in <Standort>/Anmerkungen/.
+      const notizen={};
+      for(const q of quellen){
+        const anm=(await kinder(q.pfad+'Anmerkungen/')).filter(x=>x.file&&/\.json$/i.test(x.name));
+        const tx=await Promise.all(anm.map(d=>tGet(q.pfad+'Anmerkungen/'+d.name)));
+        tx.forEach(t=>{try{const o=JSON.parse(String(t||'').replace(/^\uFEFF/,''));
+          const k=mwNotizKey(o.id,mwStufe(o.stufe),o.datum);if(k)notizen[k]=String(o.notiz||'').trim();}catch(e){}});
+      }
+      return mwNotizenAnhaengen(mwOhneDoppel(alle),notizen);
+    })().catch(()=>[]);
+    // Auf alles warten
+    // Rezeptende-Listen aus dem Patientenchecker: je Tag und Standort, wer am
+    // letzten oder vorletzten Rezepttermin stand. Sie stehen in den
+    // Kennzahlendateien (eine je Monat) und werden erst seit Oktober 2026
+    // mitgeschrieben — aeltere Monate gibt es nicht.
+    const kennP=(async()=>{
+      const jetzt=new Date(),ms=[];
+      for(let i=0;i<6;i++){const d=new Date(jetzt.getFullYear(),jetzt.getMonth()-i,1);
+        const m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(m<'2026-10')break;ms.push(m);}
+      // Neben jeder Monatsdatei liegt eine Sicherung. Alte Patientenchecker-
+      // Fenster kuerzen die Monatsdatei gelegentlich auf einen Tag; die
+      // Sicherung fassen sie nicht an. Gelesen werden beide, je Tag gewinnt
+      // die Fassung mit Zahlen.
+      const fs=await Promise.all(ms.map(m=>Promise.all([jGet(WBASE+'kennzahlen/kennzahlen-'+m+'.json'),
+        jGet(WBASE+'kennzahlen/kennzahlen-'+m+'-sicherung.json')])));
+      if(!fs.some(([h,z])=>(h&&Array.isArray(h.tage))||(z&&Array.isArray(z.tage))))return null;
+      return fs.reduce((a,[h,z])=>a.concat(kennTageZusammen(h,z)),[]);
+    })().catch(()=>null);
+    const [tm,kpiK,kpiP,auslK,auslP,fb,medRes,bwaK,bwaP,npsRaw,ksExp,ksTw,wpTp,weTp,wpHi,weHi,wpVo,weVo,f4W,mwRecs]=await Promise.all([teamsP,kpiKP,kpiPP,auslKP,auslPP,fbP,medP,bwaKP,bwaPP,npsP,ksExpP,ksTwP,wpTpP,weTpP,wpHiP,weHiP,wpVoP,weVoP,f4P,mwP]);
+    D.mw=Array.isArray(mwRecs)?mwRecs:[];
+    D.kenn=await kennP;
+    {const ab=await jGet(RE_AUSBL_FILE);D.ausbl=(ab&&ab.eintraege)||{};}
+    if(npsRaw)D.nps=pNPS(npsRaw);
+    // Krankenstand verarbeiten
+    D.ks={byMA:[],tageWoche:{}};
+    if(ksTw&&ksTw.length>1)for(let i=1;i<ksTw.length;i++){const r=ksTw[i];if(!r||!r[0])continue;D.ks.tageWoche[String(r[0]).trim().toLowerCase()]=parseInt(r[1])||5;}
+    if(ksExp&&ksExp.length>1){
+      for(let i=1;i<ksExp.length;i++){const r=ksExp[i];if(!r||!r[0])continue;D.ks.byMA.push({name:String(r[0]).trim(),days:parseInt(r[1])||0});}
+      // MA aus TageWoche, die nicht im Export sind, mit 0 Tagen ergänzen
+      const exist=new Set(D.ks.byMA.map(m=>m.name.toLowerCase()));
+      Object.keys(D.ks.tageWoche).forEach(k=>{if(!exist.has(k))D.ks.byMA.push({name:k,days:0});});
+    }
+    // Verarbeiten
+    if(tm)D.teams=tm.slice(3).filter(r=>r[0]&&!String(r[0]).includes('Therapeut')).map(r=>{const mh={};for(let i=0;i<12;i++){const v=parseFloat(r[4+i]);if(!isNaN(v)&&v>0)mh[MN[i]]=v;}let l=0;MN.forEach(m=>{if(mh[m])l=mh[m];else if(l>0)mh[m]=l;});return{n:String(r[0]).trim(),team:String(r[1]||''),standort:String(r[2]||''),bereich:String(r[3]||''),mh,wh:mh.Jan||0};});
+    // Medifox: beide Parser auf gleichen Daten (raw + medFull) → 1 Load, 2 Datasets
+    let allR=[],allMed=[],allQMT=[];
+    medRes.forEach(({d,s})=>{if(!d)return;allR=allR.concat(pRaw(d));allMed=allMed.concat(pMedFull(d,s));allQMT=allQMT.concat(pQMT(d,s));});
+    D.raw=allR;buildNM();D.raw.forEach(r=>{if(nMap[r.name])r.name=nMap[r.name];});
+    D.medRaw=allMed;
+    // Regionen strikt nach QUELLE (nicht nach Teams-Sheet, das kann veraltet sein):
+    //  Medifox F1–F3 (Excel 'KIMOJO') = Werneck (Alt-Daten vor thevea), F4 ('PHFIP') = Kitzingen = PF im Park
+    //  thevea _wp/_we = Werneck aktuell, terminplan_woche_f4 = Kitzingen aktuell
+    const thBer={};D.teams.forEach(t=>{if(t.n&&t.bereich)thBer[normN(t.n)]=t.bereich;});
+    allQMT.forEach(t=>{
+      if(nMap[t.th])t.th=nMap[t.th];
+      if(t.standort==='PHFIP'){t.region='Kitzingen';t.standort='PF im Park';}
+      else{t.region='Werneck';t.standort=/ergo/i.test(thBer[normN(t.th)]||'')?'KIMOJO Ergo':'KIMOJO Physio';}
+    });
+    // Kitzingen: Wochenkalender F4 (alle Kalender, sichere Ersttermin-Flags via Position) → PF im Park
+    const f4QMT=pKitzF4(f4W);f4QMT.forEach(t=>{t.standort='PF im Park';});
+    // Werneck: Terminplan (14 Tage, mit Therapeut) + Historie (volle Verordnungs-Historie) + VO-Übersicht (Namen)
+    // Werneck ist auch KIMOJO: _wp → KIMOJO Physio, _we → KIMOJO Ergo
+    // Vorher: Archiv laden und den aktuellen Terminplan hineinmergen. Die Historie
+    // kennt keinen Mitarbeiter – ohne Archiv bleibt sie fuer Altwochen unzuordenbar.
+    QMHIST.n=0;QMHIST.ohneMa=0; // Zaehler je Ladevorgang, nicht kumulativ
+    const wQMT=pWerneckQMT(wpTp,unwrapH(wpHi),unwrapV(wpVo),'KIMOJO Physio')
+      .concat(pWerneckQMT(weTp,unwrapH(weHi),unwrapV(weVo),'KIMOJO Ergo'));
+    f4QMT.concat(wQMT).forEach(t=>{if(nMap[t.th])t.th=nMap[t.th];});
+    // Excel-Alt-Termine als Dublette markieren, wo aktuelle Quellen denselben Zeitraum abdecken
+    // (bleiben für Historie/Ersttermin-Erkennung erhalten, tauchen aber nicht doppelt in den Listen auf)
+    const f4Days=new Set(f4QMT.map(t=>qmDayKey(t.dt)));
+    const wMin=wQMT.length?Math.min(...wQMT.map(t=>t.dt.getTime())):Infinity;
+    allQMT.forEach(t=>{
+      if(t.region==='Kitzingen'&&f4Days.has(qmDayKey(t.dt)))t.dup=true;
+      if(t.region==='Werneck'&&t.dt.getTime()>=wMin)t.dup=true;
+    });
+    D.qmTermine=allQMT.concat(f4QMT,wQMT);
+    lt.textContent='Lade QM-Daten...';await qmLoad();qmFixAltTh();
+    D.kpiK=kpiK;D.kpiP=kpiP;
+    if(auslK)D.auslK=pAusl(auslK);
+    if(auslP)D.auslP=pAusl(auslP);
+    const aKWs=[...D.auslK.map(d=>d.kw),...D.auslP.map(d=>d.kw)];sKW=Math.min(cKW()-1,aKWs.length?Math.max(...aKWs):cKW()-1);
+    if(fb)D.fb=pFB(fb);
+    const [clK,clP]=await Promise.all([clubKP,clubPP]);
+    D.club={W:pClub(clK),K:pClub(clP)};
+    D.bwaK=bwaK;D.bwaP=bwaP;
+    ld.classList.add('h');document.getElementById('db').style.display='block';render();
+  }catch(e){lt.textContent='Fehler: '+e.message;console.error(e);}
+}
+
+// HELPERS
+const Q_MAP={Q1:['Jan','Feb','Mär'],Q2:['Apr','Mai','Jun'],Q3:['Jul','Aug','Sep'],Q4:['Okt','Nov','Dez']};
+function getMs(){
+  const avail=new Set(D.raw.map(r=>r.mo).filter(Boolean).map(m=>MN[m-1]));
+  if(aM==='YTD'){const cur=new Date().getMonth();return MN.filter((m,i)=>avail.has(m)&&i<cur);}
+  if(Q_MAP[aM])return Q_MAP[aM].filter(m=>avail.has(m));
+  return[aM];
+}
+function getMNums(){return getMs().map(m=>MN.indexOf(m)+1);}
+// Region nach Standort: KIMOJO Physio/Ergo = Werneck, PF im Park (PHFIP) = Kitzingen
+function matchT(t){const so=String(t.standort||'');const isW=/^KIMOJO/i.test(so)||/werneck/i.test(so);if(REG==='Werneck'&&!isW)return false;if(REG==='Kitzingen'&&isW)return false;if(aF==='Alle')return true;if(aF==='KIMOJO Physio')return t.standort==='KIMOJO Physio';if(aF==='KIMOJO Ergo')return t.standort==='KIMOJO Ergo';if(aF==='PHFIP')return t.standort==='PF im Park';return true;}
+function ac(v){return v>=93?'var(--teal)':v>=90?'var(--amber)':'var(--red)';}
+function ec(v){return v>=65?'var(--teal)':v>=55?'var(--amber)':'var(--red)';}
+function toggleM(key){manualState[key]=!manualState[key];localStorage.setItem('okrManual',JSON.stringify(manualState));render();}
+function getMonthFromSheet(n){const nl=n.toLowerCase();const map={januar:'Jan',february:'Feb',februar:'Feb','märz':'Mär',march:'Mär',april:'Apr',mai:'Mai',juni:'Jun',juli:'Jul',august:'Aug',september:'Sep',oktober:'Okt',november:'Nov',dezember:'Dez'};for(const[l,s] of Object.entries(map)){if(nl.includes(l))return s;}for(const m of MN){if(nl.includes(m.toLowerCase()))return m;}return null;}
+
+// Krankenstand-Statistik: pro MA auf 5-Tage-Woche normiert, dann hochgerechnet aufs Jahr.
+// Ziel: ≤ 15 d/Jahr bei Vollzeit (TW=5). Teilzeit wird hochskaliert (z.B. 6d bei 3d/Wo = 10d-Vollzeit).
+function getKSStats(){
+  const out={maCount:0,projVollzeit:0,target:15,overTarget:0,available:false};
+  if(!D.ks||!D.ks.byMA||!D.ks.byMA.length)return out;
+  const completed=new Date().getMonth(); // verstrichene volle Monate (0-basiert)
+  if(completed<=0)return out;
+  // Tage/Woche fuzzy-Lookup
+  const getTW=name=>{
+    const tw=D.ks.tageWoche,nl=name.toLowerCase().replace(/\s*\(.*?\)\s*/g,'').replace(/\s+/g,' ').trim();
+    if(tw[nl])return tw[nl];
+    const parts=nl.split(/[,\s]+/).filter(p=>p.length>1);
+    for(const[k,v] of Object.entries(tw)){
+      const kp=k.split(/[,\s]+/).filter(p=>p.length>1);
+      if(parts.length>=2&&kp.length>=2&&parts.filter(p=>kp.includes(p)).length>=2)return v;
+    }
+    return 5;
+  };
+  // Krankheitstage je MA aggregieren
+  const ksByName={};
+  D.ks.byMA.forEach(m=>{const k=m.name.toLowerCase().replace(/\s*\(.*?\)\s*/g,'').replace(/\s+/g,' ').trim();if(!ksByName[k])ksByName[k]=0;ksByName[k]+=m.days;});
+  // Standortfilter über Teams
+  const list=D.teams.filter(t=>matchT(t)).map(t=>{
+    const ctrlClean=t.n.toLowerCase().replace(/\s*\(.*?\)\s*/g,'').replace(/\s+/g,' ').trim();
+    const ctrlParts=ctrlClean.split(/[,\s]+/).filter(p=>p.length>2);
+    const surname=t.n.includes(',')?t.n.split(',')[0].trim().toLowerCase():ctrlParts[ctrlParts.length-1];
+    let days=0;
+    if(ksByName[ctrlClean]!==undefined)days=ksByName[ctrlClean];
+    else for(const[k,v] of Object.entries(ksByName)){if(surname&&surname.length>2&&k.includes(surname)){const others=ctrlParts.filter(p=>p!==surname);if(!others.length||others.some(p=>k.includes(p))){days=v;break;}}}
+    const tw=getTW(t.n)||5;
+    // Normieren auf Vollzeit (5-Tage-Woche), dann auf Jahr hochrechnen
+    const projVollzeit=days*(5/tw)*(12/completed);
+    return{days,tw,projVollzeit};
+  });
+  if(!list.length)return out;
+  out.maCount=list.length;
+  out.projVollzeit=list.reduce((s,m)=>s+m.projVollzeit,0)/list.length;
+  out.overTarget=list.filter(m=>m.projVollzeit>15).length;
+  out.available=true;
+  return out;
+}
+
+// Auslastung-Durchschnitt mit Standort- und Monats-/Quartalsfilter
+const _AUSL_L2S={Januar:'Jan',Februar:'Feb','März':'Mär',April:'Apr',Mai:'Mai',Juni:'Jun',Juli:'Jul',August:'Aug',September:'Sep',Oktober:'Okt',November:'Nov',Dezember:'Dez'};
+function getAvgAuslastung(){
+  const mxKW=cKW()-1,selMs=getMs();
+  const moMatch=d=>{const ds=_AUSL_L2S[d.month]||d.month;return aM==='YTD'||selMs.includes(ds);};
+  let aV=[];
+  if(aF==='Alle'||aF==='KIMOJO Physio')aV.push(...D.auslK.filter(d=>d.kw<=mxKW&&moMatch(d)).map(d=>d.physio));
+  if(aF==='Alle'||aF==='KIMOJO Ergo')aV.push(...D.auslK.filter(d=>d.kw<=mxKW&&d.ergo!==null&&moMatch(d)).map(d=>d.ergo));
+  if(aF==='Alle'||aF==='PHFIP')aV.push(...D.auslP.filter(d=>d.kw<=mxKW&&moMatch(d)).map(d=>d.physio));
+  return aV.length?aV.reduce((a,b)=>a+b,0)/aV.length:0;
+}
+
+// NPS Score (Skala 1-10, Frage "Wie wahrscheinlich..."), gefiltert nach Standort
+// PHFIP nutzt diese Umfrage NICHT (nur KIMOJO Werneck)
+function getNPS(){
+  if(!D.nps||!D.nps.length)return{avg:0,n:0,available:false};
+  if(aF==='PHFIP')return{avg:0,n:0,available:false};
+  let arr=D.nps;
+  if(aF==='KIMOJO Physio')arr=D.nps.filter(x=>x.bereich.includes('physio'));
+  else if(aF==='KIMOJO Ergo')arr=D.nps.filter(x=>x.bereich.includes('ergo'));
+  // Monatsfilter (falls Datum vorhanden)
+  const mn=getMNums();
+  const withDate=arr.filter(x=>x.date);
+  if(withDate.length>0)arr=arr.filter(x=>!x.date||mn.includes(x.date.getMonth()+1));
+  if(!arr.length)return{avg:0,n:0,available:true};
+  const avg=arr.reduce((s,x)=>s+x.nps,0)/arr.length;
+  return{avg,n:arr.length,available:true};
+}
+
+// Offene Rezepte count per standort
+function getOffene(standortFilter){
+  const now=new Date(),co=new Date(now.getTime()-14*24*60*60*1000);
+  const patients={};
+  D.medRaw.forEach(r=>{
+    if(standortFilter!=='Alle'&&r.standort!==standortFilter)return;
+    if(!patients[r.pat+'||'+r.standort])patients[r.pat+'||'+r.standort]={lastDate:null,hasOpen:false};
+    const p=patients[r.pat+'||'+r.standort];
+    if(!p.lastDate||r.dt>p.lastDate)p.lastDate=r.dt;
+    if(r.open)p.hasOpen=true;
+  });
+  return Object.values(patients).filter(p=>p.hasOpen&&p.lastDate&&p.lastDate<co).length;
+}
+// Rendite from BWA
+function getRendite(){
+  const ms=getMs();let umsatz=0,ergebnis=0;
+  const bwaSrc=[];
+  if(aF==='Alle'||aF==='KIMOJO Physio'||aF==='KIMOJO Ergo')bwaSrc.push(D.bwaK);
+  if(aF==='Alle'||aF==='PHFIP')bwaSrc.push(D.bwaP);
+  bwaSrc.forEach(bwa=>{ms.forEach(m=>{const entry=Object.entries(bwa).find(([s])=>getMonthFromSheet(s)===m);if(entry&&entry[1].umsatz!==0){umsatz+=entry[1].umsatz;ergebnis+=entry[1].ergebnis;}});});
+  return umsatz>0?ergebnis/umsatz*100:0;
+}
+// Get months where BWA data actually exists
+function getBWAMonths(){
+  const allBwaMs=new Set();
+  Object.keys(D.bwaK).forEach(s=>{const m=getMonthFromSheet(s);if(m&&D.bwaK[s].umsatz!==0)allBwaMs.add(m);});
+  Object.keys(D.bwaP).forEach(s=>{const m=getMonthFromSheet(s);if(m&&D.bwaP[s].umsatz!==0)allBwaMs.add(m);});
+  return allBwaMs;
+}
+
+function render(){rFlt();rOKR();rPM();rClub();rVW();rAusl();rFB();rTH();rQM();}
+
+function rFlt(){
+  const avail=new Set(D.raw.map(r=>r.mo).filter(Boolean).map(m=>MN[m-1]));
+  const qAvail=q=>Q_MAP[q].some(m=>avail.has(m));
+  // Top-Filter
+  let h='<span class="fl">Zeitraum</span><button class="fp'+(aM==='YTD'?' a':'')+'" onclick="aM=\'YTD\';render()">YTD</button>';
+  ['Q1','Q2','Q3','Q4'].forEach(q=>{if(qAvail(q))h+=`<button class="fp${aM===q?' a':''}" onclick="aM='${q}';render()">${q}</button>`;});
+  h+='<span class="sep"></span>';
+  MN.forEach(m=>{if(avail.has(m))h+=`<button class="fp${aM===m?' a':''}" onclick="aM='${m}';render()">${m}</button>`;});
+  // Feinauswahl je Region: KIMOJO Physio/Ergo = Werneck, PHFIP (PF im Park) = Kitzingen
+  h+='<span class="sep"></span><span class="fl">Standort</span>';
+  let standorte=[{k:'Alle',c:'#999'}];
+  if(REG!=='Kitzingen')standorte.push({k:'KIMOJO Physio',c:'var(--red)'},{k:'KIMOJO Ergo',c:'var(--ergo)'});
+  if(REG!=='Werneck')standorte.push({k:'PHFIP',c:'var(--teal)'});
+  standorte.forEach(s=>{
+    h+=`<button class="fp${aF===s.k?' a':''}" onclick="aF='${s.k}';render()"><span class="dot" style="background:${s.c}"></span>${s.k}</button>`;});
+  document.getElementById('fltDiv').innerHTML=h;
+  // Hinweis: Für Werneck sind OKR-/Auslastungs-Kennzahlen noch nicht als Dateien angebunden
+  const rh=document.getElementById('regHint');
+  if(rh)rh.innerHTML=REG==='Werneck'?'<div class="reg-hint">📍 <b>Region Werneck (KIMOJO):</b> QM-Kontrollen (Befund &amp; Doku) laufen über den thevea-Export (_wp = Physio, _we = Ergo). Therapeuten-/Team-Ansichten zeigen die KIMOJO-Standorte.</div>':'';
+}
+
+function kr(label,ist,ziel,unit,hb,colorFn,opts){
+  const allowNeg=opts&&opts.neg;
+  const has=allowNeg?(ist!==null&&ist!==undefined&&!isNaN(ist)):ist>0;
+  const pct=ziel>0?(hb?Math.max(0,Math.min(100,ist/ziel*100)):0):0;
+  const cls=has?(colorFn?colorFn(ist):(pct>=85?'g':pct>=60?'y':'r')):'n';
+  let is='—';if(has){if(unit==='€')is=ist.toFixed(1).replace('.',',')+' €';else if(unit==='%')is=ist.toFixed(1).replace('.',',')+' %';else is=ist.toFixed(1);}
+  return{h:`<div class="kr"><div class="kr-top"><span class="kr-name">${label}</span><div class="kr-vals"><span class="kr-ist ${cls}">${is}</span><span class="kr-ziel">Ziel: ${ziel}${unit}</span></div></div><div class="kr-bar"><div class="kr-fill ${cls}" style="width:${has?pct:0}%"></div></div></div>`,p:has?pct:0,d:has};
+}
+function krInv(label,ist,ziel,unit){
+  const pct=ist>=0?(ist<=ziel?100:Math.max(0,100-((ist-ziel)/ziel)*100)):0;
+  const cls=ist>=0?(pct>=85?'g':pct>=60?'y':'r'):'n';
+  let is='—';if(ist>=0){if(unit==='%')is=ist.toFixed(1).replace('.',',')+' %';else is=Math.round(ist).toString();}
+  return{h:`<div class="kr"><div class="kr-top"><span class="kr-name">${label}</span><div class="kr-vals"><span class="kr-ist ${cls}">${is}</span><span class="kr-ziel">Ziel: ≤${ziel}${unit}</span></div></div><div class="kr-bar"><div class="kr-fill ${cls}" style="width:${ist>=0?pct:0}%"></div></div></div>`,p:ist>=0?pct:0,d:ist>=0};
+}
+function krM(label,key){
+  const done=manualState[key]||false;
+  return{h:`<div class="kr"><div class="kr-top"><span class="kr-name">${label}</span><div class="kr-vals"><span class="kr-ist ${done?'g':'n'} kr-check" onclick="event.stopPropagation();toggleM('${key}')">${done?'✅':'⬜'} ${done?'Erledigt':'Ausstehend'}</span></div></div><div class="kr-manual">Manuell · Klicken zum Ändern</div></div>`,p:done?100:0,d:true};
+}
+function score(krs){const v=krs.filter(k=>k.d);return v.length?Math.round(v.reduce((s,k)=>s+k.p,0)/v.length):0;}
+
+function rOKR(){
+  const ms=getMs(),mn=getMNums();
+  const kK=pKPI(D.kpiK),kP=pKPI(D.kpiP);let bf=0,dk=0,kc=0;
+  ms.forEach(m=>{if(kK[m]&&(aF==='Alle'||aF.includes('KIMOJO'))){bf+=kK[m].befund;dk+=kK[m].doku;kc++;}if(kP[m]&&(aF==='Alle'||aF==='PHFIP')){bf+=kP[m].befund;dk+=kP[m].doku;kc++;}});
+  if(kc>0){bf/=kc;dk/=kc;}
+  // Feedback - include current month too
+  const fbF=D.fb.filter(f=>f.date.getFullYear()===2026&&mn.includes(f.date.getMonth()+1)&&f.stars>0);
+  const avgFb=fbF.length?fbF.reduce((s,f)=>s+f.stars,0)/fbF.length:0;
+  // Auslastung (mit Standort+Monats-/Quartalsfilter)
+  const avgA=getAvgAuslastung();
+  // €/h
+  const flt=D.raw.filter(r=>mn.includes(r.mo));const th=D.teams.filter(t=>matchT(t));const tn=new Set(th.map(t=>t.n));
+  const ag={};flt.forEach(r=>{if(aF!=='Alle'&&!tn.has(r.name))return;if(!ag[r.name])ag[r.name]=0;ag[r.name]+=r.pr;});
+  // MA mit 0 Umsatz im Zeitraum ausschließen (Freistellung/nicht mehr da)
+  const ephs=th.map(t=>{const rev=ag[t.n]||0;if(rev<=0)return null;const h=getWhM(t,ms);return h>0?rev/h:null;}).filter(v=>v!==null&&v>0);
+  const avgE=ephs.length?ephs.reduce((a,b)=>a+b,0)/ephs.length:0;
+
+  const fbCls=v=>v>=4?'g':v>=3?'y':'r';
+  const auslCls=v=>v>=93?'g':v>=90?'y':'r';
+  const ephCls=v=>v>=65?'g':v>=55?'y':'r';
+  const npsCls=v=>v>=9?'g':v>=7?'y':'r';
+  const q1=kr(aF==='KIMOJO Ergo'?'Klientenzufriedenheit':'Patientenzufriedenheit',avgFb,4.0,'/5',true,fbCls);
+  const q2=kr('Befund-Stichprobe',bf,9,'/10',true);const q3=kr('Doku-Stichprobe',dk,9,'/10',true);
+  const q4=krM('Monatliche Weiterbildung','t_wb');
+  // NPS-KR (nur für KIMOJO, da Umfrage nur dort)
+  const npsData=getNPS();
+  const qN=npsData.available?kr(`Weiterempfehlung NPS${npsData.n>0?' ('+npsData.n+')':''}`,npsData.avg,9,'/10',true,npsCls):null;
+  const qs=score(qN?[q1,q2,q3,qN]:[q1,q2,q3]);
+  const w1=kr('Auslastung',avgA,93,'%',true,auslCls);const w2=kr('ø €/Stunde',avgE,65,'€',true,ephCls);
+  const ws=score([w1,w2]);
+  // Krankheitstage: pro MA auf 5-Tage-Woche normiert + auf Jahr hochgerechnet, Ziel ≤15
+  const ksStats=getKSStats();
+  const t1=ksStats.available?krInv(`Krankheitstage ø/MA hochgerechnet (Vollzeit-Äq.) · ${ksStats.overTarget}/${ksStats.maCount} MA über Ziel`,Math.round(ksStats.projVollzeit*10)/10,15,'d'):krM('Krankheitstage tracken (Taxmaro)','t_kt');
+  const t2=krM('Mitarbeiterzufriedenheit','t_mz');const t3=krM('Teamevent dieses Quartal','t_te');
+  const ts=score([t1,t2,t3]);
+  document.getElementById('okrT').innerHTML=
+    `<div class="okr"><div class="okr-head q"><div class="okr-cat">⭐ Qualität</div><div class="okr-obj">Unsere Patienten erleben spürbare Fortschritte — weil wir zielgerichtet, individuell und mit messbarem Anspruch behandeln.</div><div class="okr-score">${qs}%</div></div><div class="okr-body">${q1.h}${qN?qN.h:''}${q2.h}${q3.h}${q4.h}</div></div>`+
+    `<div class="okr"><div class="okr-head w"><div class="okr-cat">📈 Wirtschaftlich</div><div class="okr-obj">Wir sind wirtschaftlich stabil und planbar aufgestellt.</div><div class="okr-score">${ws}%</div></div><div class="okr-body">${w1.h}${w2.h}</div></div>`+
+    `<div class="okr"><div class="okr-head t"><div class="okr-cat">💚 Teamgeist</div><div class="okr-obj">Wir arbeiten als Team füreinander — offen, ehrlich und mit Freude.</div><div class="okr-score">${ts}%</div></div><div class="okr-body">${t1.h}${t2.h}${t3.h}</div></div>`;
+}
+
+function rPM(){
+  const ms=getMs(),mn=getMNums();
+  const fbF=D.fb.filter(f=>f.date.getFullYear()===2026&&mn.includes(f.date.getMonth()+1)&&f.stars>0);
+  const avgFb=fbF.length?fbF.reduce((s,f)=>s+f.stars,0)/fbF.length:0;
+  const standortMed=aF==='PHFIP'?'PHFIP':aF==='KIMOJO Physio'||aF==='KIMOJO Ergo'?'KIMOJO':'Alle';
+  const offene=getOffene(standortMed);
+  // Auslastung (mit Standort+Monats-/Quartalsfilter)
+  const avgA=getAvgAuslastung();
+
+  const fbCls=v=>v>=4.5?'g':v>=3.5?'y':'r';
+  const auslCls=v=>v>=93?'g':v>=90?'y':'r';
+  const npsClsP=v=>v>=9?'g':v>=7?'y':'r';
+  const pq1=kr('Patientenzufriedenheit',avgFb,4.5,'/5',true,fbCls);
+  const pq2=krM('Rückmeldung innerhalb 24h','pm_rm');
+  const pq3=krInv('Offene Rezepte',offene,10,'');
+  const npsP=getNPS();
+  const pqN=npsP.available?kr(`Weiterempfehlung NPS${npsP.n>0?' ('+npsP.n+')':''}`,npsP.avg,9,'/10',true,npsClsP):null;
+  const pqs=score(pqN?[pq1,pq3,pqN]:[pq1,pq3]);
+  const pw1=kr('Auslastung',avgA,93,'%',true,auslCls);const pw2=krM('Urlaubsplanung frühzeitig','pm_up');
+  const pws=score([pw1]);
+  const pt1=krM('Team-Zufriedenheit ≥ 8/10','pm_tz');const pt2=krM('Teamevent pro Quartal','pm_te');const pt3=krM('Quartalsgespräch','pm_qg');const pt4=krM('1x/Jahr Team-Tag','pm_tt');
+  const pts=score([pt1,pt2,pt3,pt4]);
+  document.getElementById('okrP').innerHTML=
+    `<div class="okr"><div class="okr-head q"><div class="okr-cat">🌟 Qualität</div><div class="okr-obj">Wir bieten unseren Patient:innen einen außergewöhnlichen Service, der sie begeistert und bei uns bleiben lässt.</div><div class="okr-score">${pqs}%</div></div><div class="okr-body">${pq1.h}${pqN?pqN.h:''}${pq2.h}${pq3.h}</div></div>`+
+    `<div class="okr"><div class="okr-head w"><div class="okr-cat">📊 Wirtschaftlich</div><div class="okr-obj">Wir erreichen eine wirtschaftlich stabile und planbare Auslastung.</div><div class="okr-score">${pws}%</div></div><div class="okr-body">${pw1.h}${pw2.h}</div></div>`+
+    `<div class="okr"><div class="okr-head t"><div class="okr-cat">🤝 Teamgeist</div><div class="okr-obj">Unser Team arbeitet mit Zufriedenheit, Vertrauen, gegenseitiger Unterstützung sowie einer verantwortlichen Person.</div><div class="okr-score">${pts}%</div></div><div class="okr-body">${pt1.h}${pt2.h}${pt3.h}${pt4.h}</div></div>`;
+}
+
+function rVW(){
+  const rendite=getRendite();
+  const vq1=krM('BWA bis 15. des Monats fertig','vw_bwa');const vq2=krM('Geringe Rückläufer-Quote','vw_rl');const vq3=krM('Kommunikation Physio ↔ Arztpraxen','vw_kom');
+  const vqs=score([vq1,vq2,vq3]);
+  const renditeCls=v=>v>=20?'g':v>=10?'y':v>=0?'y':'r';
+  const vw1=kr('Rendite',rendite,20,'%',true,renditeCls,{neg:true});
+  const vws=score([vw1]);
+  const vt1=krM('½-jährliche Mitarbeiterumfrage','vw_mu');const vt2=krM('Quartalsgespräch','vw_qg');
+  const vts=score([vt1,vt2]);
+  document.getElementById('okrV').innerHTML=
+    `<div class="okr"><div class="okr-head q"><div class="okr-cat">📋 Qualität</div><div class="okr-obj">Unsere Verwaltung ist die Grundlage für einen reibungslosen Praxisbetrieb.</div><div class="okr-score">${vqs}%</div></div><div class="okr-body">${vq1.h}${vq2.h}${vq3.h}</div></div>`+
+    `<div class="okr"><div class="okr-head w"><div class="okr-cat">💰 Wirtschaftlich</div><div class="okr-obj">Wir steuern die Finanzen transparent und sichern eine Rendite von 20%.</div><div class="okr-score">${vws}%</div></div><div class="okr-body">${vw1.h}</div></div>`+
+    `<div class="okr"><div class="okr-head t"><div class="okr-cat">🤝 Teamgeist</div><div class="okr-obj">Wertschätzung und familiäre Atmosphäre — egal ob Physio, Ergo oder Verwaltung.</div><div class="okr-score">${vts}%</div></div><div class="okr-body">${vt1.h}${vt2.h}</div></div>`;
+}
+
+function chKW(d){const a=[...D.auslK.map(x=>x.kw),...D.auslP.map(x=>x.kw)];if(!a.length)return;sKW=Math.max(Math.min(...a),Math.min(Math.max(...a),sKW+d));rAusl();}
+function rAusl(){
+  const kD=D.auslK,pD=D.auslP,ck=cKW();
+  const kwK=kD.find(d=>d.kw===sKW),kwP=pD.find(d=>d.kw===sKW);
+  const mo=kwK?kwK.month:kwP?kwP.month:'';
+  document.getElementById('kwT').textContent='KW '+sKW;document.getElementById('kwI').textContent=mo+' · Aktuelle KW: '+ck;
+  function bar(l,v,dc){if(v===null||v===undefined)return`<div class="ab"><span class="ab-l"><span class="dot" style="background:${dc}"></span>${l}</span><span style="color:var(--muted);font-size:12px">—</span></div>`;const w=Math.min(100,Math.max(5,v)),c=ac(v);return`<div class="ab"><span class="ab-l"><span class="dot" style="background:${dc}"></span>${l}</span><div class="ab-t"><div class="ab-f" style="width:${w}%;background:${c}">${v}%</div><div class="ab-tgt"></div></div><span class="ab-v" style="color:${c}">${v}%</span></div>`;}
+  const mk=ck-1,avg=(a,k)=>{const v=a.filter(d=>d[k]!==null);return v.length?Math.round(v.reduce((s,d)=>s+d[k],0)/v.length*10)/10:null;};
+  // Month filter: if single month selected, filter KWs to that month
+  const selMs=getMs();
+  // Map long month names in Auslastung data to short names for comparison
+  const l2s={Januar:'Jan',Februar:'Feb','März':'Mär',April:'Apr',Mai:'Mai',Juni:'Jun',Juli:'Jul',August:'Aug',September:'Sep',Oktober:'Okt',November:'Nov',Dezember:'Dez'};
+  function moMatch(d){const ds=l2s[d.month]||d.month;return selMs.includes(ds);}
+  const kM=kD.filter(d=>d.month===mo&&d.kw<=mk),pM=pD.filter(d=>d.month===mo&&d.kw<=mk);
+  // YTD/month filter: only include KWs from selected months
+  const kY=kD.filter(d=>d.kw<=mk&&(aM==='YTD'||moMatch(d))),pY=pD.filter(d=>d.kw<=mk&&(aM==='YTD'||moMatch(d)));
+  const showKP=aF==='Alle'||aF==='KIMOJO Physio',showKE=aF==='Alle'||aF==='KIMOJO Ergo',showPF=aF==='Alle'||aF==='PHFIP';
+  function cd(t,kp,ke,pp){let h=`<div class="ac"><h4>${t}</h4>`;if(showKP)h+=bar('KIMOJO Physio',kp,'var(--red)');if(showKE)h+=bar('KIMOJO Ergo',ke,'var(--ergo)');if(showPF)h+=bar('PHFIP Physio',pp,'var(--teal)');return h+'</div>';}
+  document.getElementById('auslD').innerHTML=cd('KW '+sKW,kwK?kwK.physio:null,kwK?kwK.ergo:null,kwP?kwP.physio:null)+cd('ø '+(mo||'Monat'),avg(kM,'physio'),avg(kM.filter(d=>d.ergo!==null),'ergo'),avg(pM,'physio'))+cd('ø '+(aM==='YTD'?'YTD':aM),avg(kY,'physio'),avg(kY.filter(d=>d.ergo!==null),'ergo'),avg(pY,'physio'));
+}
+function rFB(){
+  const recent=D.fb.filter(f=>f.date.getFullYear()>=2025).sort((a,b)=>b.date-a.date).slice(0,6);
+  document.getElementById('fbD').innerHTML=recent.map(f=>{const s='★'.repeat(Math.round(f.stars))+'☆'.repeat(5-Math.round(f.stars));const d=f.date.toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'numeric'});return`<div class="fb-card"><div class="fb-stars">${s}</div><div class="fb-text">"${(f.text||'—').slice(0,100)}"</div><div class="fb-meta"><span>${f.name||'Anonym'}</span><span>${d}</span></div></div>`;}).join('')||'<p style="color:var(--muted)">Keine Bewertungen.</p>';
+}
+let thTeam='Alle';
+function rTH(){
+  const ms=getMs(),mn=getMNums();
+  const teams=[...new Set(D.teams.filter(t=>matchT(t)).map(t=>t.team).filter(Boolean))].sort();
+  // Team filter
+  let fh='<span class="fl">Team</span><button class="fp'+(thTeam==='Alle'?' a':'')+'" onclick="thTeam=\'Alle\';rTH()">Alle</button>';
+  teams.forEach(t=>{fh+=`<button class="fp${thTeam===t?' a':''}" onclick="thTeam='${t.replace(/'/g,"\\'")}';rTH()">${t}</button>`;});
+  document.getElementById('thFlt').innerHTML=fh;
+  // Data
+  const flt=D.raw.filter(r=>mn.includes(r.mo));
+  const ag={};flt.forEach(r=>{if(!ag[r.name])ag[r.name]={rev:0,cnt:0};ag[r.name].rev+=r.pr;ag[r.name].cnt++;});
+  let list=D.teams.filter(t=>matchT(t)&&(thTeam==='Alle'||t.team===thTeam)).map(t=>{
+    const a=ag[t.n]||{rev:0,cnt:0};const h=getWhM(t,ms);
+    const ep=h>0?a.rev/h:0;return{...t,u:a.rev,b:a.cnt,ep,h};
+  });
+  list.sort((a,b)=>b.ep-a.ep);
+  // Balken auf Basis €/Stunde (Skala 0-80 €/h für visuellen Vergleich)
+  const CC={'KIMOJO Physio':'kp','KIMOJO Ergo':'ke','PF im Park':'pf'};
+  document.getElementById('thTb').innerHTML=list.map(t=>{
+    const cls=t.ep>=65?'g':t.ep>=55?'y':'r';
+    const bc=CC[t.standort]||'kp';
+    const bw=Math.min(100,(t.ep/80*100));
+    const barC=t.ep>=65?'var(--teal)':t.ep>=55?'var(--amber)':'var(--red)';
+    return`<tr><td style="font-weight:700">${t.n}</td><td><span class="s-badge ${bc}">${t.team}</span></td><td><span class="s-badge ${bc}">${t.standort}</span></td><td style="text-align:right"><span class="eph-badge ${cls}">${t.ep>0?t.ep.toFixed(2).replace('.',','):'—'}</span></td><td><div class="minibar"><div class="minibar-f" style="width:${bw}%;background:${barC}"></div></div></td></tr>`;
+  }).join('');
+}
+/* =====================================================================
+   QM-MODUL · Befund- & Doku-Stichproben
+   Kriterienkatalog = 1:1 aus der Forms-"Checkliste Befundstichproben".
+   Zum Anpassen: einfach Fragen/Optionen unten ändern (o = [Label, Punkte]).
+   Speicherung: qm-kontrollen.json im Laufwerk der KIMOJOManagement-Site.
+   ===================================================================== */
+const QM_FILE='qm-kontrollen.json';
+const QM_ZIEL=5; // Stichproben pro Woche und Typ
+const QM_KRIT={
+ befund:{titel:'Befund-Kontrolle',icon:'📋',fragen:[
+  {id:'b1',t:'Frontansicht ausgefüllt? (Rezeptbezeichnung, Problembeschreibung, Ziel)',o:[['Ja',2],['Nein',0]]},
+  {id:'b2',t:'Im Schmerzmännchen betroffener Bereich ausgewählt?',o:[['Ja',2],['Nein',0]]},
+  {id:'b3',t:'Erwägungen sinnvoll? Kann ich damit arbeiten?',o:[['Ja',2],['Ich muss Nachfragen stellen',1],['Nein',0]]},
+  {id:'b4',t:'PSFS ausgefüllt?',o:[['Ja',2],['Nein',0]]},
+  {id:'b5',t:'Relevante Tests vorhanden?',o:[['Ja',2],['Zum Teil',1],['Nein',0]]},
+  {id:'b6',t:'Behandlungsplan inklusive Maßnahmen ausgefüllt?',o:[['Ja',2],['Nein',0]]}]},
+ doku:{titel:'Doku-Kontrolle',icon:'📝',fragen:[
+  {id:'d1',t:'Doku vorhanden?',o:[['Ja',2],['Nein',0]]},
+  {id:'d2',t:'"Reaktionsbaustein" ausgewählt und ausgefüllt?',o:[['Ja',2],['Nein',0]]},
+  {id:'d3',t:'Maßnahmendokumentation vollständig? (Technik, Trainingsparameter)',o:[['Ja',2],['Teilweise',1],['Nein',0]]},
+  {id:'d4',t:'Passen die Maßnahmen zu den im Befund festgelegten Zielen?',o:[['Ja',2],['Teilweise',1],['Nein',0]]}]}};
+function qmMax(typ){return QM_KRIT[typ].fragen.reduce((s,f)=>s+Math.max(...f.o.map(x=>x[1])),0);}
+// Bewertungsstufen (aus dem QM-Standard, in % je Kontrolltyp)
+function qmStufe(p){return p>=90?{n:'sehr vollständig',cls:'g',c:'var(--teal)'}:p>=75?{n:'vollständig',cls:'g',c:'var(--green)'}:p>=60?{n:'eher unvollständig',cls:'y',c:'var(--amber)'}:{n:'unvollständig',cls:'r',c:'var(--red)'};}
+
+let QM={data:{kontrollen:[],zuordnung:{}},kw:null,jahr:null,showAllB:false,showAllD:false,openD:{},anTyp:'beide',anZeit:'YTD',anOpen:null,cur:null,etagWarned:false,cfgOpen:false,nurMeine:true};
+
+/* --- Fachliche Leitungen ----------------------------------------------------
+   Erkennung ueber die Login-E-Mail (MSAL username). Welche Therapeut:innen zu
+   wem gehoeren, wird NICHT hier gepflegt, sondern im Dashboard unter
+   "⚙️ Zuteilung" und landet in qm-kontrollen.json -> beide Leitungen sehen
+   dieselbe Zuteilung.                                                        */
+const QM_LEITUNG=[
+  {mail:'paula@kimojo-physio.de',kurz:'Paula'},
+  {mail:'monika@kimojo-physio.de',kurz:'Monika'}
+];
+function qmMail(){return String((ml.getActiveAccount()||{}).username||'').toLowerCase();}
+function qmMe(){const m=qmMail();return QM_LEITUNG.find(l=>l.mail===m)||null;}
+function qmZu(){if(!QM.data.zuordnung)QM.data.zuordnung={};return QM.data.zuordnung;}
+const qmKurz=mail=>(QM_LEITUNG.find(l=>l.mail===mail)||{}).kurz||'';
+// true = dieser Termin/diese Therapeut:in faellt in meine Zustaendigkeit
+function qmMein(th){const me=qmMe();if(!me||!QM.nurMeine)return true;return qmZu()[th]===me.mail;}
+
+// --- ISO-Kalenderwoche für beliebiges Datum ---
+function kwOf(dt){const d=new Date(dt);d.setHours(0,0,0,0);d.setDate(d.getDate()+3-(d.getDay()+6)%7);const w=new Date(d.getFullYear(),0,4);return{kw:1+Math.round(((d.getTime()-w.getTime())/864e5-3+(w.getDay()+6)%7)/7),jahr:d.getFullYear()};}
+function seedRnd(str){let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))|0;return((h>>>0)%100000)/100000;}
+
+// --- Laden / Speichern (JSON-Datei via Graph im KIMOJOManagement-Drive) ---
+async function qmLoad(){
+  try{
+    const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${QM_FILE}:/content`,{headers:{Authorization:'Bearer '+window._tk}});
+    if(r.ok){QM.data=await r.json();if(!QM.data.kontrollen)QM.data.kontrollen=[];}
+    else QM.data={kontrollen:[]};
+  }catch(e){QM.data={kontrollen:[]};}
+  if(!QM.data.zuordnung)QM.data.zuordnung={};
+}
+/* Alt-Kontrollen korrigieren: bis 01.10.2026 lieferte der Historien-Export keinen
+   Mitarbeiter, der Name stammte aus einer Rueckprojektion des Terminplans und war
+   teilweise falsch. Jetzt steht der echte Mitarbeiter am Termin -> gespeicherte
+   Namen dagegen abgleichen. Idempotent, laeuft bei jedem Laden und vor jedem
+   Speichern (dann landet die Korrektur auch in der Datei). */
+function qmFixAltTh(){
+  if(!D.qmTermine)return 0;
+  const th={};
+  D.qmTermine.forEach(t=>{if(t.region!=='Werneck'||!t.th||t.th==='—')return;
+    th[t.pos+'|'+qmDayKey(t.dt)+'|'+t.uz]=t.th;});
+  let n=0;
+  (QM.data.kontrollen||[]).forEach(k=>{
+    if((k.region||'Kitzingen')!=='Werneck')return;
+    const echt=th[k.posNr+'|'+k.terminDatum+'|'+k.uhrzeit];
+    if(!echt||echt===k.therapeut)return;
+    if(!k.therapeutAlt)k.therapeutAlt=k.therapeut; // nachvollziehbar, was vorher drinstand
+    k.therapeut=echt;n++;
+  });
+  if(n>0)console.warn(n+' Alt-Kontrolle(n) auf den echten Therapeuten korrigiert');
+  return n;
+}
+async function qmSave(){
+  // Token frisch holen (das beim Laden geholte Token läuft nach ~1h ab → sonst 401 beim Speichern)
+  try{window._tk=await gTk();}catch(e){throw new Error('Anmeldung abgelaufen – bitte Seite neu laden und erneut anmelden.');}
+  // Vor dem Schreiben frisch laden und zusammenführen (2 Leitungen parallel → nichts geht verloren)
+  const mine=QM.data.kontrollen;
+  try{
+    const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${QM_FILE}:/content`,{headers:{Authorization:'Bearer '+window._tk}});
+    if(r.ok){const remote=await r.json();const ids=new Set((remote.kontrollen||[]).map(k=>k.id));const merged=(remote.kontrollen||[]).concat(mine.filter(k=>!ids.has(k.id)));QM.data.kontrollen=merged;
+      // Zuteilung ebenfalls zusammenführen; lokale Änderung gewinnt
+      QM.data.zuordnung=Object.assign({},remote.zuordnung||{},QM.data.zuordnung||{});}
+  }catch(e){}
+  qmFixAltTh(); // auch die gerade vom Server geholten Datensaetze korrigieren
+  const put=()=>fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${QM_FILE}:/content`,{method:'PUT',headers:{Authorization:'Bearer '+window._tk,'Content-Type':'application/json'},body:JSON.stringify(QM.data)});
+  let res=await put();
+  if(res.status===401){ // Token doch abgelaufen → einmal erneuern und wiederholen
+    try{window._tk=await gTk();res=await put();}catch(e){}
+  }
+  if(!res.ok){
+    let hint='';
+    if(res.status===401)hint=' – Anmeldung abgelaufen, bitte Seite neu laden';
+    else if(res.status===403)hint=' – keine Schreibrechte auf KIMOJOManagement, bitte bei Kilian melden';
+    throw new Error('Speichern fehlgeschlagen ('+res.status+hint+')');
+  }
+}
+
+// Standort-Feinfilter (mit Alt-Aliassen: 'Werneck Physio/Ergo' aus früheren Kontrollen zählt als KIMOJO)
+function qmSoMatch(standort){const so=String(standort||'');
+  if(aF==='PHFIP')return so==='PF im Park'||so==='PHFIP';
+  if(aF==='KIMOJO Physio')return so==='KIMOJO Physio'||so==='Werneck Physio';
+  if(aF==='KIMOJO Ergo')return so==='KIMOJO Ergo'||so==='Werneck Ergo';
+  return so===aF;}
+// ===================================================================
+//  CLUB · Therapiemanager – Tagesliste aus den Weekly-KPI-Trackern
+//  Werneck = KIMOJO-Tracker (FI.kpi), Kitzingen = PHFIP-Tracker (FI.kpiP)
+// ===================================================================
+// Spalten werden über die Kopfzeile erkannt, nicht über die Position (Werneck hat zwei Spalten mehr)
+const CL_COLS=[
+  {k:'gespr',l:'Gespräche geführt',re:/gespr[aä]ch/i},
+  {k:'praev',l:'Präventionskurse',kz:'Prävention',re:/pr[aä]vention/i,ab:1},
+  {k:'club',l:'Club-Mitgliedschaften',kz:'Club',re:/club/i,ab:1},
+  {k:'trena',l:'T-RENA',re:/t-?rena/i,ab:1},
+  {k:'rv',l:'R+V Fit',re:/r\s*\+\s*v/i,ab:1},
+  {k:'nicht',l:'Nicht abgeschlossen',re:/nicht\s*abgeschl/i},
+  {k:'frez',l:'Folgerezept',re:/folge\s*rezept/i},
+  {k:'fterm',l:'Folgetermin',re:/folgetermin/i},
+  {k:'ern',l:'Ernährung',re:/ern[aä]hrung/i},
+  {k:'abgel',l:'Therapeut:in abgelehnt',re:/abgelehnt/i},
+  {k:'nang',l:'Nicht erreicht',re:/angetroffen|r[uü]ckmeldung/i}
+];
+// Zelle lesen wie eingetragen: Zahl · "2 (1x wsl Club)" → 2 + Notiz · reiner Text (Urlaub, Wochenende, frei) → nur Notiz
+function clCell(v){
+  if(v===null||v===undefined)return null;
+  if(typeof v==='number')return{n:v,note:''};
+  const s=String(v).trim();if(!s)return null;
+  const m=s.match(/^(\d+(?:[.,]\d+)?)\s*\+?\s*(.*)$/);
+  if(m)return{n:parseFloat(m[1].replace(',','.')),note:m[2].replace(/^\((.*)\)$/,'$1').trim()};
+  return{n:null,note:s};
+}
+function clDate(v){
+  if(typeof v==='number'&&v>40000){const d=new Date(Math.round((v-25569)*864e5));return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());}
+  const m=String(v||'').match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if(m){const y=parseInt(m[3]);return new Date(y<100?2000+y:y,parseInt(m[2])-1,parseInt(m[1]));}
+  return null;
+}
+function pClub(rows){
+  if(!rows||rows.length<2)return null;
+  const hdr=(rows[0]||[]).map(h=>String(h||'').trim());
+  const di=hdr.findIndex(h=>/^datum$/i.test(h));if(di<0)return null;
+  const map=[];hdr.forEach((h,i)=>{if(!h)return;const c=CL_COLS.find(c=>c.re.test(h));if(c&&!map.some(x=>x.c===c))map.push({c,i});});
+  map.sort((a,b)=>CL_COLS.indexOf(a.c)-CL_COLS.indexOf(b.c));
+  const days=[];
+  for(let r=1;r<rows.length;r++){const row=rows[r];if(!row)continue;const dt=clDate(row[di]);if(!dt)continue;
+    const v={};let any=false;map.forEach(({c,i})=>{const x=clCell(row[i]);if(x){v[c.k]=x;any=true;}});
+    if(any)days.push({dt,v});}
+  days.sort((a,b)=>a.dt-b.dt);
+  return{cols:map.map(x=>x.c),days};
+}
+// Zeitleiste des Club-Reiters: ein Tag, eine Woche oder ein frei gewaehlter
+// Zeitraum. Die Ansicht je Standort merkt sich, welcher Reiter offen ist.
+let CL={modus:'T',tag:null,von:null,bis:null,ansicht:{w:'reise',k:'reise'}};
+function clHeute(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function clMontag(d){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x;}
+function clBereich(){
+  let von,bis;
+  if(CL.modus==='T'){von=new Date(CL.tag);bis=new Date(CL.tag);}
+  else if(CL.modus==='W'){von=clMontag(CL.tag);bis=new Date(von);bis.setDate(bis.getDate()+6);}
+  else{von=new Date(CL.von);bis=new Date(CL.bis);}
+  von.setHours(0,0,0,0);bis.setHours(23,59,59,999);
+  return{von,bis};
+}
+// Tage ueberspringen Wochenenden — da ist die Praxis zu. In die Zukunft geht
+// es nicht: Fuer morgen gibt es noch keine Gespraeche.
+function clNaechsterWerktag(d){const x=new Date(d);x.setHours(0,0,0,0);do{x.setDate(x.getDate()+1);}while(x.getDay()===0||x.getDay()===6);return x;}
+// Ein Tag nach vorne geht: der naechste Therapietag als Vorschau.
+function clSchritt(n){
+  const h=clHeute();
+  if(CL.modus==='T'){const d=new Date(CL.tag);
+    do{d.setDate(d.getDate()+n);}while(d.getDay()===0||d.getDay()===6);
+    if(d>clNaechsterWerktag(h))return;CL.tag=d;}
+  else if(CL.modus==='W'){const d=new Date(CL.tag);d.setDate(d.getDate()+7*n);
+    if(clMontag(d)>h)return;CL.tag=d;}
+  rClub();
+}
+function clModus(m){CL.modus=m;rClub();}
+function clZuHeute(){CL.tag=clHeute();rClub();}
+function clZeitraum(){
+  const v=document.getElementById('clVon'),b=document.getElementById('clBis');
+  const p=x=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(x||'');return m?new Date(+m[1],+m[2]-1,+m[3]):null;};
+  const dv=p(v&&v.value),db=p(b&&b.value);
+  if(dv&&db&&dv<=db){CL.von=dv;CL.bis=db;rClub();}
+}
+function clAnsicht(k,a){CL.ansicht[k]=a;rClub();}
+// Strichliste: bis zu einem Monat Tag fuer Tag, darueber Woche fuer Woche.
+function clTageweise(){if(CL.modus!=='Z')return true;const{von,bis}=clBereich();return(bis-von)<=31*864e5;}
+function rClub(){
+  const el=document.getElementById('clD');if(!el)return;
+  const h0=clHeute();
+  if(!CL.tag){CL.tag=new Date(h0);while(CL.tag.getDay()===0||CL.tag.getDay()===6)CL.tag.setDate(CL.tag.getDate()-1);}
+  if(!CL.von){CL.von=new Date(h0.getFullYear(),h0.getMonth(),1);CL.bis=new Date(h0);}
+  const{von,bis}=clBereich();
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const fD=d=>d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  let titel;
+  if(CL.modus==='T')titel=CL.tag.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})+(+CL.tag===+h0?' · heute':CL.tag>h0?' · Vorschau':'');
+  else if(CL.modus==='W'){const w=kwOf(von);titel='KW '+w.kw+' · '+fD(von)+' – '+fD(bis)+(von<=h0&&h0<=bis?' · laufende Woche':'');}
+  else titel=fD(von)+'.'+von.getFullYear()+' – '+fD(bis)+'.'+bis.getFullYear();
+  const nav=document.getElementById('clNav');
+  if(nav)nav.innerHTML='<div class="cl-nav-l">'
+    +(CL.modus==='Z'
+      ?'<input type="date" id="clVon" value="'+iso(von)+'" onchange="clZeitraum()"> – <input type="date" id="clBis" value="'+iso(bis)+'" max="'+iso(h0)+'" onchange="clZeitraum()">'
+      :'<button class="nav-btn" onclick="clSchritt(-1)">←</button><h3>'+esc(titel)+'</h3><button class="nav-btn" onclick="clSchritt(1)">→</button>'
+        +'<button class="fp" onclick="clZuHeute()">Heute</button>')
+    +'</div><div class="cl-per">'+[['T','Tag'],['W','Woche'],['Z','Zeitraum']].map(([k,l])=>
+      '<button class="fp'+(CL.modus===k?' a':'')+'" onclick="clModus(\''+k+'\')">'+l+'</button>').join('')+'</div>';
+  const showW=REG!=='Kitzingen'&&(aF==='Alle'||aF.includes('KIMOJO'));
+  const showK=REG!=='Werneck'&&(aF==='Alle'||aF==='PHFIP');
+  let h='';
+  if(showW)h+=clOrt('w','Werneck · KIMOJO',von,bis);
+  if(showK)h+=clOrt('k','Kitzingen · PHFIP',von,bis);
+  el.innerHTML=h||'<div class="qm-empty">Für die aktuelle Auswahl gibt es keine Club-Daten.</div>';
+}
+function clOrt(k,titel,von,bis){
+  const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['strich','Strichliste (Excel)']];
+  const a=CL.ansicht[k];
+  const ortRe=k==='w'?/werneck|kimojo/i:/kitzingen|phfip/i;
+  let body;
+  if(a==='reise')body=k==='w'?reAnsicht(['wp','we'],ortRe,von,bis):reKitzAnsicht(ortRe,von,bis);
+  else if(a==='gespr')body=mwGespraeche(von,bis,ortRe);
+  else body=clCard(titel,k,(D.club||{})[k==='w'?'W':'K'],von,bis);
+  return '<div class="cr-ort"><div class="cl-card-h '+k+'"><span>🏋️ '+esc(titel)+'</span>'
+    +'<div class="cr-tabs">'+reiter.map(([x,l])=>'<button class="'+(a===x?'a':'')
+      +'" onclick="clAnsicht(\''+k+'\',\''+x+'\')">'+esc(l)+'</button>').join('')+'</div></div>'
+    +'<div class="cr-body">'+body+'</div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REZEPTENDE → GESPRAECH
+// ═══════════════════════════════════════════════════════════════════════════
+// Die Frage des Unternehmers: Faellt jemand durch? Startpunkt ist die Liste
+// aus dem Patientenchecker — wer am letzten oder vorletzten Rezepttermin
+// stand. Wer schon einen Folgetermin hat, laeuft weiter (Folgerezept). Mit
+// allen anderen muss gesprochen werden, und das Gespraech muss in MyWellness
+// stehen. Wer zwei Werktage nach dem letzten Termin noch keins hat, ist
+// ueberfaellig und taucht so lange wieder auf, bis eins da ist.
+//
+// Ein Fall ist ein Rezept (Patienten-Id + Rezept-Id aus thevea), nicht ein
+// Listeneintrag — sonst zaehlte, wer am vorletzten UND am letzten Termin
+// dastand, doppelt. MyWellness kennt die thevea-Id nicht; die Bruecke ist der
+// Name. Ab dem ersten Gespraech traegt die Id aus MyWellness die Reise weiter.
+const RE_FRIST=2;
+function reNorm(s){
+  return String(s||'').toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z]+/).filter(w=>w.length>1).sort().join(' ');
+}
+function reTag(ds){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(ds||'');return m?new Date(+m[1],+m[2]-1,+m[3]):null;}
+function reIso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function rePlusWerktage(d,n){const x=new Date(d);x.setHours(0,0,0,0);while(n>0){x.setDate(x.getDate()+1);const w=x.getDay();if(w!==0&&w!==6)n--;}return x;}
+function reWerktageZwischen(a,b){let n=0;const x=new Date(a);x.setHours(0,0,0,0);while(x<b){x.setDate(x.getDate()+1);const w=x.getDay();if(w!==0&&w!==6&&x<=b)n++;}return n;}
+// Aus den Tageslisten die Faelle: einer je Rezept. Spaetere Tage gewinnen —
+// wer am vorletzten Termin noch keinen Folgetermin hatte und am letzten schon,
+// hat einen.
+function reFaelle(tage,locIds){
+  const F={};
+  (tage||[]).filter(t=>t&&t.ds&&t.loc).slice().sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0).forEach(t=>{
+    locIds.forEach(lid=>{
+      const L=t.loc[lid],a=L&&L.heute&&L.heute.ansprechen;if(!Array.isArray(a))return;
+      a.forEach(x=>{
+        if(!x||!x.n)return;
+        const k=x.id&&x.v?x.id+'|'+x.v:'n|'+reNorm(x.n);
+        const f=F[k]||(F[k]={k,name:x.n,id:x.id||'',loc:lid,tage:[],vTage:[],th:'',folge:0,ende:''});
+        if(!f.tage.includes(t.ds))f.tage.push(t.ds);
+        if(x.th&&x.th!=='—')f.th=x.th;
+        f.folge=x.f?1:0;
+        // Der tatsaechlich beobachtete letzte Termin schlaegt den geplanten.
+        if(x.p==='l'){f.ende=t.ds;f.lGesehen=1;}
+        else{if(x.e&&!f.lGesehen)f.ende=x.e;if(!f.vTage.includes(t.ds))f.vTage.push(t.ds);}
+      });
+    });
+  });
+  // Ein Fall gehoert zum Tag seines LETZTEN Termins: Dort ist das Gespraech
+  // faellig und dort beginnt die Frist. Der vorletzte Termin kuendigt ihn nur an.
+  return Object.keys(F).map(k=>{const f=F[k];f.tage.sort();f.ab=f.ende||'';return f;});
+}
+function reMwIndex(mw){
+  const nm={},id={};
+  (mw||[]).forEach(r=>{const k=reNorm(r.name);if(k)(nm[k]=nm[k]||[]).push(r);if(r.id)(id[r.id]=id[r.id]||[]).push(r);});
+  return{nm,id};
+}
+// Stand eines Falls, gemessen an heute. Das Gespraech darf bis zu zwei Wochen
+// VOR dem ersten Auftauchen liegen: Manche sprechen schon beim vorletzten
+// Termin eines frueheren Listentags oder gleich beim ersten Hinweis.
+// start = Tag des ersten Fragebogens am Standort. Wer davor schon fertig war,
+// konnte gar kein Gespraech im Fragebogen bekommen — "ueberfaellig" waere eine
+// erfundene Luecke. Solche Faelle heissen "vorher" und werden nicht bewertet.
+function reStand(f,ix,heute,start){
+  const ab=reTag(f.ab),fenster=new Date(ab);fenster.setDate(fenster.getDate()-14);
+  const treffer=(ix.nm[reNorm(f.name)]||[]).filter(r=>r.dt>=fenster).sort((a,b)=>a.dt-b.dt);
+  const ids=[...new Set(treffer.map(r=>r.id).filter(Boolean))];
+  let schritte=treffer;
+  if(ids.length===1)schritte=(ix.id[ids[0]]||[]).filter(r=>r.dt>=fenster).sort((a,b)=>a.dt-b.dt||a.stufe-b.stufe);
+  const ende=reTag(f.ende);
+  const frist=ende?rePlusWerktage(ende,RE_FRIST):null;
+  let status;
+  if(f.folge)status='folge';
+  else if(schritte.length)status='erfasst';
+  else if(start&&ende&&ende<start)status='vorher';
+  else if(frist&&heute>frist)status='ueber';
+  else status='offen';
+  // Nachgetragen nach Frist: Das Gespraech zaehlt als erfasst, aber der erste
+  // Fragebogen kam erst nach Ablauf der zwei Werktage. Das ist meist die
+  // Rueckmeldung, die beim Therapeuten haengt.
+  let spaet=0;
+  if(status==='erfasst'&&frist){const d0=new Date(schritte[0].dt);d0.setHours(0,0,0,0);if(d0>frist)spaet=reWerktageZwischen(frist,d0);}
+  return Object.assign({},f,{status,schritte,frist,spaet,mehrdeutig:ids.length>1,
+    letzter:schritte.length?schritte[schritte.length-1]:null});
+}
+// Tage aus Monatsdatei und Sicherung zusammenlegen: je Tag die Fassung mit
+// Zahlen (loc), bei beiden die der Monatsdatei.
+function kennTageZusammen(haupt,sich){
+  const voll=t=>!!(t&&t.loc&&Object.keys(t.loc).length);
+  const P={};
+  ((haupt&&Array.isArray(haupt.tage))?haupt.tage:[]).forEach(t=>{if(t&&t.ds)P[t.ds]=t;});
+  ((sich&&Array.isArray(sich.tage))?sich.tage:[]).forEach(t=>{if(t&&t.ds&&voll(t)&&!voll(P[t.ds]))P[t.ds]=t;});
+  return Object.keys(P).sort().map(k=>P[k]);
+}
+// ── Kitzingen: die Liste kommt direkt aus Medifox ──────────────────────────
+// Werneck braucht die taegliche Mitschrift, weil der thevea-Tagesplan nur den
+// Tag selbst kennt. Medifox dagegen liefert in behandlungen_alle.json zu jedem
+// Rezept ALLE Termine, vergangene wie geplante — daraus steht fuer jeden Tag
+// fest, wer seinen letzten oder vorletzten Termin hatte. Dieselbe Regel wie im
+// Rezept-Ende-Reiter der Kitzinger index.html: letzter/vorletzter Besuchstag
+// eines Rezepts; Folgetermin, wenn danach schon ein Termin oder eine
+// Reservierung steht. Kein zweiter Stand neben einer Kennzahlendatei — fuer
+// Kitzingen schreibt niemand eine.
+const RE_MF_STATUS=new Set([1,2,4]); // 1 geplant, 4 erbracht; 8/16/32 sind Absagen
+// Medifox fuehrt auch Club, Praeventionskurse, T-RENA und reine Diagnostik als
+// "Verordnung". Das sind keine Rezepte, an deren Ende ein Gespraech faellig
+// ist — sonst steht etwa eine Club-Mitgliedschaft an ihrem vorletzten
+// Club-Termin als Rezeptende da (Siemers, 26.10.2026).
+function reKeinRezept(beschreibung){
+  const b=String(beschreibung||'');
+  if(QM_AUSSEN[0].re.test(b))return true;                       // Club, Praevention, T-RENA, Reha-Sport …
+  if(/trainingseinheit in der gruppe/i.test(b))return true;     // T-RENA-Folgeeinheiten
+  if(/diagnostik/i.test(b)&&!/krankengymnastik|lymph|mld|therapie|massage|behandlung|traktion|elektro|packung/i.test(b))return true;
+  return false;
+}
+function reKitzTage(beh,pl,heuteIso){
+  const nm={};(pl||[]).forEach(p=>{if(p&&p.Id)nm[p.Id]=((p.Nachname||'')+', '+(p.Vorname||'')).trim();});
+  const proTag={};
+  (Array.isArray(beh)?beh:[]).forEach(p=>{
+    const pid=p&&p.patientId;if(!pid)return;
+    const d=p.data||{};
+    const spaeter=[];
+    (d.Verordnungen||[]).forEach(v=>(v.Termine||[]).forEach(x=>{if(x&&x.Datum&&RE_MF_STATUS.has(x.Status))spaeter.push(String(x.Datum).slice(0,10));}));
+    (d.Terminreservierungen||[]).forEach(r=>{const b=r&&(r.Beginn||r.beginn||r.Datum);if(b)spaeter.push(String(b).slice(0,10));});
+    (d.Verordnungen||[]).forEach(v=>{
+      if(!v||v.IsReadOnly||reKeinRezept(v.Beschreibung))return;
+      const te=(v.Termine||[]).filter(x=>x&&x.Datum&&RE_MF_STATUS.has(x.Status))
+        .map(x=>({ds:String(x.Datum).slice(0,10),th:x.MitarbeiterName||''})).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0);
+      const tage=[...new Set(te.map(x=>x.ds))];if(!tage.length)return;
+      const ende=tage[tage.length-1];
+      const folge=spaeter.some(ds=>ds>ende)?1:0;
+      const name=nm[pid]||'Unbekannt';
+      const dazu=(ds,pos)=>{if(heuteIso&&ds>heuteIso)return;
+        const th=(te.find(x=>x.ds===ds)||{}).th||'';
+        (proTag[ds]=proTag[ds]||[]).push({n:name,p:pos,f:folge,id:String(pid),v:String(v.Id||''),th,e:ende});};
+      dazu(ende,'l');if(tage.length>1)dazu(tage[tage.length-2],'v');
+    });
+  });
+  return Object.keys(proTag).sort().map(ds=>({ds,loc:{f4:{heute:{ansprechen:proTag[ds]}}}}));
+}
+// Die Medifox-Dateien sind gross (rund 8 MB) und werden erst geholt, wenn
+// jemand die Kitzinger Reise ansieht.
+let MF={status:null,tage:null};
+function reKitzLaden(){
+  if(MF.status)return;MF.status='laden';
+  const jGet=path=>{const e=path.split('/').filter(x=>x).map(encodeURIComponent).join('/');
+    return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/content`,{cache:'no-store',headers:{Authorization:'Bearer '+window._tk}})
+      .then(r=>r.ok?r.text():null).then(t=>t?JSON.parse(t.replace(/^\uFEFF/,'')):null).catch(()=>null);};
+  Promise.all([jGet('12_Code/Controlling/behandlungen_alle.json'),jGet('12_Code/Controlling/patientenliste.json')])
+    .then(([beh,pl])=>{
+      if(!Array.isArray(beh)){MF.status='fehlt';}
+      else{MF.tage=reKitzTage(beh,pl,reIso(clNaechsterWerktag(clHeute())));MF.status='ok';MF.ohneNamen=!Array.isArray(pl);}
+      rClub();
+    });
+}
+function reKitzAnsicht(ortRe,von,bis){
+  if(!MF.status)reKitzLaden();
+  if(MF.status==='laden')return '<div class="qm-empty">Medifox-Daten werden geladen …</div>';
+  if(MF.status==='fehlt')return '<div class="qm-note">behandlungen_alle.json aus Medifox ist nicht lesbar — '
+    +'ohne sie gibt es für Kitzingen keine Rezeptende-Liste. Keine Zahlen angezeigt.</div>';
+  return (MF.ohneNamen?'<div class="qm-note">patientenliste.json nicht lesbar — die Namen fehlen, '
+    +'die Zuordnung zu den Fragebögen ist dadurch nicht möglich.</div>':'')
+    +reAnsicht(['f4'],ortRe,von,bis,undefined,MF.tage);
+}
+// ── Ausblenden ─────────────────────────────────────────────────────────────
+// Ein Patient kommt fuer das Gespraech nicht in Frage (Dauerpatient,
+// Hausbesuch, …). Gespeichert gemeinsam auf SharePoint, damit alle dasselbe
+// sehen; Schluessel ist der Fall (Standort + Patient + Rezept).
+const RE_AUSBL_FILE='12_Code/Controlling/MyWellness/ausgeblendet.json';
+const RE_GRUENDE=['Dauerpatient','Hausbesuch','Sonstiges'];
+let RE_FORM=null;
+function reAusblKey(f){return (f.loc||'')+':'+f.k;}
+function reAusblKnopf(f){return '<button class="re-btn" data-k="'+esc(reAusblKey(f))+'" onclick="reAusblStart(this.dataset.k)">Ausblenden</button>';}
+function reAusblForm(f,spalten){
+  const k=reAusblKey(f);if(RE_FORM!==k)return '';
+  return '<tr class="re-form"><td colspan="'+spalten+'"><div class="re-form-in"><b>'+esc(f.name)+' ausblenden</b>'
+    +'<select id="reAusGrund">'+RE_GRUENDE.map(g=>'<option>'+esc(g)+'</option>').join('')+'</select>'
+    +'<input id="reAusNotiz" type="text" placeholder="Notiz (bei „Sonstiges“ Pflicht)">'
+    +'<button class="re-btn re-btn-a" data-k="'+esc(k)+'" data-n="'+esc(f.name)+'" onclick="reAusblSpeichern(this.dataset.k,this.dataset.n)">Speichern</button>'
+    +'<button class="re-btn" onclick="reAusblAbbr()">Abbrechen</button></div></td></tr>';
+}
+function reAusblStart(k){RE_FORM=k;rClub();setTimeout(()=>{const n=document.getElementById('reAusNotiz');if(n)n.focus();},50);}
+function reAusblAbbr(){RE_FORM=null;rClub();}
+async function reAusblSpeichern(k,name){
+  const g=(document.getElementById('reAusGrund')||{}).value||'Sonstiges';
+  const n=((document.getElementById('reAusNotiz')||{}).value||'').trim();
+  if(g==='Sonstiges'&&!n){alert('Bitte bei „Sonstiges“ kurz notieren, warum der Patient nicht in Frage kommt.');return;}
+  try{await reAusblSchreiben(k,{grund:g,notiz:n,name,von:(ml.getActiveAccount()||{}).name||'',am:new Date().toISOString()});
+    RE_FORM=null;rClub();}catch(e){alert(e.message);}
+}
+async function reAusblAufheben(k){
+  if(!confirm('Patient wieder einblenden? Er zählt dann wieder als fällig.'))return;
+  try{await reAusblSchreiben(k,null);rClub();}catch(e){alert(e.message);}
+}
+// Vor dem Schreiben frisch lesen und zusammenfuehren: Zwei Leute duerfen
+// gleichzeitig ausblenden, ohne sich gegenseitig zu ueberschreiben. Ist die
+// Datei da, aber nicht lesbar, wird nichts geschrieben.
+async function reAusblSchreiben(k,eintrag){
+  try{window._tk=await gTk();}catch(e){throw new Error('Anmeldung abgelaufen – bitte Seite neu laden.');}
+  const url=`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${RE_AUSBL_FILE.split('/').map(encodeURIComponent).join('/')}:/content`;
+  let daten={v:1,eintraege:{}};
+  const r=await fetch(url,{cache:'no-store',headers:{Authorization:'Bearer '+window._tk}});
+  if(r.ok){const o=await r.json().catch(()=>null);if(!o||typeof o.eintraege!=='object')throw new Error('Ausblendungen nicht lesbar – nichts gespeichert.');daten=o;}
+  else if(r.status!==404)throw new Error('Ausblendungen nicht lesbar ('+r.status+') – nichts gespeichert.');
+  if(eintrag)daten.eintraege[k]=eintrag;else delete daten.eintraege[k];
+  const w=await fetch(url,{method:'PUT',headers:{Authorization:'Bearer '+window._tk,'Content-Type':'application/json'},body:JSON.stringify(daten)});
+  if(!w.ok)throw new Error('Speichern fehlgeschlagen ('+w.status+(w.status===403?' – keine Schreibrechte auf KIMOJOManagement':'')+')');
+  D.ausbl=daten.eintraege;
+}
+function reErgLabel(k){const e=MW_ERG.concat([MW_UNBEKANNT]).find(x=>x.k===k);return e?e.l:k;}
+// Der Patientenchecker schreibt zu jedem Tag auch die Liste des naechsten
+// Therapietags mit ("morgen"). Daraus wird die Vorschau — und ein Ersatz fuer
+// einen Tag, an dem die eigene Liste fehlt (etwa wenn der thevea-Flow steht).
+// Solche Tage tragen "vorschauVon", damit die Ansicht es sagen kann.
+function reVorschauTage(tage,locIds){
+  const voll=(t,l)=>t&&t.loc&&t.loc[l]&&t.loc[l].heute&&Array.isArray(t.loc[l].heute.ansprechen);
+  const echt=new Set();(tage||[]).forEach(t=>{if(t&&locIds.some(l=>voll(t,l)))echt.add(t.ds);});
+  const neu={};
+  (tage||[]).filter(t=>t&&t.ds&&t.loc).slice().sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0).forEach(t=>{
+    locIds.forEach(l=>{
+      const m=t.loc[l]&&t.loc[l].morgen;
+      if(!m||!m.ds||!Array.isArray(m.ansprechen)||m.ds<=t.ds||echt.has(m.ds))return;
+      const e=neu[m.ds]||(neu[m.ds]={ds:m.ds,loc:{},vorschauVon:t.ds});
+      e.loc[l]={heute:{ansprechen:m.ansprechen}};e.vorschauVon=t.ds;
+    });
+  });
+  return Object.keys(neu).map(k=>neu[k]);
+}
+function reAnsicht(locIds,ortRe,von,bis,jetzt,tageQuelle){
+  const ausMedifox=tageQuelle!==undefined;
+  const QT=ausMedifox?tageQuelle:(D.kenn==null?null:D.kenn.concat(reVorschauTage(D.kenn,locIds)));
+  if(QT==null)return '<div class="qm-note">Die Kennzahlendatei des Patientencheckers ist nicht lesbar — '
+    +'ohne sie gibt es keine Rezeptende-Liste. Keine Zahlen angezeigt.</div>';
+  const heute=jetzt||clHeute();
+  const vI=reIso(von),bI=reIso(bis);
+  const listenTage=QT.filter(t=>t&&t.loc&&locIds.some(l=>t.loc[l]&&t.loc[l].heute&&Array.isArray(t.loc[l].heute.ansprechen)))
+    .map(t=>t.ds).sort();
+  const erster=listenTage[0];
+  const mw=(D.mw||[]).filter(r=>!r.standort||ortRe.test(r.standort));
+  const ix=reMwIndex(mw);
+  const start=mw.length?(()=>{const d=new Date(Math.min(...mw.map(r=>+r.dt)));d.setHours(0,0,0,0);return d;})():null;
+  const alle=reFaelle(QT,locIds).map(f=>reStand(f,ix,heute,start));
+  // Von Hand ausgeblendet (Dauerpatient, Hausbesuch, …): zaehlt nicht mehr
+  // als faellig, steht aber mit Grund unten in "Ausgeblendet".
+  const AB=D.ausbl||{};
+  alle.forEach(f=>{const e=AB[reAusblKey(f)];if(e&&(f.status==='offen'||f.status==='ueber')){f.ausbl=e;f.statusVorher=f.status;f.status='aus';}});
+  const imZr=alle.filter(f=>f.ab&&f.ab>=vI&&f.ab<=bI);
+  // Wer frueher dran war, bis zum Ende des Zeitraums seine Frist verpasst hat
+  // und bis heute kein Gespraech hat, taucht wieder auf.
+  const rueck=alle.filter(f=>f.ab&&f.ab<vI&&f.status==='ueber'&&f.frist&&f.frist<=bis&&!imZr.includes(f));
+  // Am gewaehlten Tag nur beim vorletzten Termin — sie kommen noch einmal.
+  const kommen=alle.filter(f=>!imZr.includes(f)&&f.ab&&f.ab>bI&&f.vTage.some(ds=>ds>=vI&&ds<=bI)&&f.status!=='aus');
+  let h='';
+  if(!erster)return h+'<div class="qm-note">'+(ausMedifox?'In den Medifox-Daten steht kein Rezept mit letztem oder vorletztem Termin.'
+    :'Noch keine Rezeptende-Liste vorhanden. Sie wird ab dem 22.10.2026 jeden Tag vom Patientenchecker mitgeschrieben.')+'</div>';
+  if(vI>reIso(heute))h+='<div class="qm-note" style="background:#eef3fb;border-color:#c9d6ee;color:#2c4a7a"><b>Vorschau auf den nächsten Therapietag.</b> '
+    +'Diese Patienten haben dann ihren letzten oder vorletzten Termin. Wer noch keinen Folgetermin hat, braucht das Gespräch — jetzt schon einplanen.</div>';
+  const ersatz=QT.filter(t=>t.vorschauVon&&t.ds>=vI&&t.ds<=bI&&t.ds<=reIso(heute)).map(t=>t);
+  if(ersatz.length)h+='<div class="qm-note">Für '+ersatz.map(t=>reTag(t.ds).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})).join(', ')
+    +' fehlt die Tagesliste des Patientencheckers (Termindaten nicht aktuell). Gezeigt wird die Vorschau, die am '
+    +ersatz.map(t=>reTag(t.vorschauVon).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})).join(', ')
+    +' berechnet wurde — Termine, die seitdem dazukamen oder ausfielen, fehlen.</div>';
+  if(bI<erster)h+='<div class="qm-note">Für diesen Zeitraum gibt es keine Rezeptende-Liste — '+(ausMedifox
+    ?'die Medifox-Daten reichen bis zum '+reTag(erster).toLocaleDateString('de-DE')+' zurück.'
+    :'sie wird erst seit dem '+reTag(erster).toLocaleDateString('de-DE')+' mitgeschrieben.')+'</div>';
+  const n=s=>imZr.filter(f=>f.status===s).length;
+  const ohne=imZr.filter(f=>!f.folge&&f.status!=='vorher'&&f.status!=='aus');
+  const quote=ohne.length?Math.round(100*n('erfasst')/ohne.length):null;
+  const kachel=(z,l,c)=>'<div class="re-k'+(c?' '+c:'')+'"><b>'+z+'</b><span>'+l+'</span></div>';
+  h+='<div class="re-kacheln">'
+    +kachel(imZr.length-n('vorher'),'am Rezeptende')
+    +kachel(n('folge'),'mit Folgetermin')
+    +kachel(ohne.length,'ohne Folgetermin — Gespräch fällig')
+    +kachel(n('erfasst')+(quote!==null?' <small style="font-size:14px;font-weight:600">'+quote+' %</small>':''),'Gespräch erfasst','gut')
+    +kachel(n('offen'),'offen, Frist läuft')
+    +kachel(n('ueber')+rueck.length,'überfällig (> '+RE_FRIST+' Werktage)',(n('ueber')+rueck.length)?'rot':'')
+    +'</div>';
+  if(rueck.length)h+='<div class="re-leise" style="margin:-8px 0 12px">davon '+rueck.length
+    +' aus früheren Tagen, die noch immer kein Gespräch haben</div>';
+  const nSpaet=imZr.filter(f=>f.spaet).length;
+  if(nSpaet)h+='<div class="re-leise" style="margin:-8px 0 12px;color:#9a5b00">'+nSpaet+' der erfassten Gespräch'+(nSpaet===1?' wurde':'e wurden')
+    +' erst nach Ablauf der Frist eingetragen</div>';
+  if(n('vorher'))h+='<div class="qm-note">'+n('vorher')+' Fall'+(n('vorher')===1?'':'e')+' mit letztem Termin vor dem ersten Fragebogen ('
+    +start.toLocaleDateString('de-DE')+') — damals gab es noch keinen Fragebogen, sie werden deshalb nicht bewertet.</div>';
+
+  // Ergebnisse der erfassten Gespraeche — Stand der Reise, also das letzte
+  const erf=imZr.filter(f=>f.status==='erfasst');
+  const foG=imZr.filter(f=>f.status==='folge'&&f.letzter).length;
+  if(foG)h+='<div class="re-leise" style="margin:-4px 0 10px">Außerdem '+foG+' Gespräch'+(foG===1?'':'e')
+    +' mit Patienten, die schon einen Folgetermin haben — sie stehen unten bei „mit Folgetermin“.</div>';
+  if(erf.length){
+    const z={};erf.forEach(f=>{z[f.letzter.erg]=(z[f.letzter.erg]||0)+1;});
+    const reihe=MW_ERG.concat([MW_UNBEKANNT]).filter(e=>z[e.k]);
+    const max=Math.max(...reihe.map(e=>z[e.k]));
+    h+='<div class="re-kopf">Ergebnis der Gespräche <small>Stand der Reise je Person</small></div>'
+      +'<table class="mw-tab"><tbody>'+reihe.map(e=>{const a=mwArt(e.k);
+        return '<tr'+(e.k==='club'?' class="ab"':'')+'><td><span class="mw-pkt" style="background:'+MW_ART[a].f+'"></span>'+esc(e.l)+'</td>'
+          +'<td class="mw-bal"><span style="width:'+Math.round(100*z[e.k]/max)+'%;background:'+MW_ART[a].f+'"></span></td>'
+          +'<td class="mw-n">'+z[e.k]+'</td><td class="mw-wo">'+esc(MW_ART[a].l)+'</td></tr>';}).join('')+'</tbody></table>';
+  }
+
+  // Je Therapeut — fuer das Gespraech am Freitag
+  const th={};ohne.concat(rueck).forEach(f=>{const k=f.th||'ohne Angabe';const o=th[k]||(th[k]={f:0,e:0,o:0,u:0});
+    o.f++;if(f.status==='erfasst'){o.e++;if(f.spaet)o.s=(o.s||0)+1;}else if(f.status==='ueber')o.u++;else o.o++;});
+  const thK=Object.keys(th).sort((a,b)=>th[b].u-th[a].u||th[b].o-th[a].o||a.localeCompare(b));
+  if(thK.length)h+='<div class="re-kopf">Je Therapeut</div><table class="re-tab"><thead><tr><th>Therapeut</th>'
+    +'<th class="n">fällig</th><th class="n">erfasst</th><th class="n">davon nach Frist</th><th class="n">offen</th><th class="n">überfällig</th></tr></thead><tbody>'
+    +thK.map(k=>{const o=th[k];return '<tr'+(o.u?' class="re-rot"':'')+'><td>'+esc(k)+'</td><td class="n">'+o.f+'</td><td class="n">'
+      +o.e+'</td><td class="n">'+(o.s||'')+'</td><td class="n">'+o.o+'</td><td class="n">'+(o.u||'')+'</td></tr>';}).join('')+'</tbody></table>';
+
+  // Tag fuer Tag, sobald mehr als ein Tag gewaehlt ist
+  if(CL.modus!=='T'){
+    const tg=[...new Set(imZr.map(f=>f.ab))].sort();
+    if(tg.length)h+='<div class="re-kopf">Tag für Tag <small>jeder Fall am Tag seines letzten Termins</small></div>'
+      +'<table class="re-tab"><thead><tr><th>Tag</th><th class="n">Liste</th><th class="n">ohne Folgetermin</th>'
+      +'<th class="n">erfasst</th><th class="n">offen</th><th class="n">überfällig</th></tr></thead><tbody>'
+      +tg.map(ds=>{const fs=imZr.filter(f=>f.ab===ds);
+        const c=s=>fs.filter(f=>f.status===s).length;
+        return '<tr'+(c('ueber')?' class="re-rot"':'')+'><td>'+reTag(ds).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})
+          +'</td><td class="n">'+fs.length+'</td><td class="n">'+fs.filter(f=>!f.folge&&f.status!=='aus'&&f.status!=='vorher').length+'</td><td class="n">'+c('erfasst')
+          +'</td><td class="n">'+c('offen')+'</td><td class="n">'+(c('ueber')||'')+'</td></tr>';}).join('')+'</tbody></table>';
+  }
+
+  // Die Namen. Oben, wer durchzurutschen droht.
+  const dt=d=>d?d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}):'—';
+  const ueber=imZr.filter(f=>f.status==='ueber').concat(rueck).sort((a,b)=>(a.ende||a.ab)<(b.ende||b.ab)?-1:1);
+  if(ueber.length)h+='<div class="re-kopf" style="color:#c03b35">Überfällig — kein Gespräch '+RE_FRIST+' Werktage nach dem letzten Termin</div>'
+    +'<table class="re-tab"><thead><tr><th>Patient</th><th>Therapeut</th><th>letzter Termin</th><th class="n">Werktage drüber</th><th></th></tr></thead><tbody>'
+    +ueber.map(f=>'<tr class="re-rot"><td>'+esc(f.name)+'</td><td>'+esc(f.th||'—')+'</td><td>'+dt(reTag(f.ende))
+      +'</td><td class="n">'+reWerktageZwischen(f.frist,heute)+'</td><td>'+reAusblKnopf(f)+'</td></tr>'+reAusblForm(f,5)).join('')+'</tbody></table>';
+  const offen=imZr.filter(f=>f.status==='offen');
+  if(offen.length)h+='<div class="re-kopf">Offen — Frist läuft noch</div>'
+    +'<table class="re-tab"><thead><tr><th>Patient</th><th>Therapeut</th><th>letzter Termin</th><th>Gespräch bis</th><th></th></tr></thead><tbody>'
+    +offen.map(f=>'<tr><td>'+esc(f.name)+'</td><td>'+esc(f.th||'—')+'</td><td>'+(f.ende?dt(reTag(f.ende)):'<span class="re-leise">noch nicht bekannt</span>')
+      +'</td><td>'+(f.frist?dt(f.frist):'—')+'</td><td>'+reAusblKnopf(f)+'</td></tr>'+reAusblForm(f,5)).join('')+'</tbody></table>';
+  const mitG=imZr.filter(f=>f.status==='erfasst');
+  if(mitG.length)h+='<div class="re-kopf">Gespräch erfasst</div>'
+    +'<table class="re-tab"><thead><tr><th>Patient</th><th>Therapeut</th><th>Reise</th></tr></thead><tbody>'
+    +mitG.map(f=>'<tr><td>'+esc(f.name)+(f.spaet?' <span class="re-spaet" title="Frist war '+(f.frist?f.frist.toLocaleDateString('de-DE'):'')
+        +'">nachgetragen nach Frist (+'+f.spaet+' Werktag'+(f.spaet===1?'':'e')+')</span>':'')+(f.mehrdeutig?' <span class="re-leise" title="Mehrere Personen dieses Namens in MyWellness">⚠ Name mehrdeutig</span>':'')
+      +'</td><td>'+esc(f.th||'—')+'</td><td class="re-weg">'+f.schritte.map(r=>{const a=mwArt(r.erg);
+        return '<span class="mw-pkt" style="background:'+MW_ART[a].f+'"></span>'+(r.stufe?r.stufe+'. ':'')+esc(reErgLabel(r.erg))
+          +' <span class="re-leise">'+r.dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>'
+          +(r.notiz?'<div class="re-notiz">„'+esc(r.notiz)+'“</div>':'');}).join(' <span class="mw-pfeil">→</span> ')
+      +'</td></tr>').join('')+'</tbody></table>';
+  if(kommen.length)h+='<div class="re-kopf">Kommen noch zum letzten Termin <small>'+kommen.length
+    +' — am gewählten Tag nur beim vorletzten Termin, werden erst am letzten gezählt</small></div>'
+    +'<div class="re-leise">'+kommen.sort((a,b)=>a.ab<b.ab?-1:1).map(f=>esc(f.name)+' ('+(f.th?esc(f.th)+', ':'')
+      +reTag(f.ab).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})+(f.folge?', Folgetermin steht':'')+')').join(' · ')+'</div>';
+  const aus=imZr.filter(f=>f.status==='aus');
+  if(aus.length)h+='<div class="re-kopf">Ausgeblendet <small>'+aus.length+' — zählen nicht als fällig</small></div>'
+    +'<table class="re-tab"><thead><tr><th>Patient</th><th>Therapeut</th><th>Grund</th><th>Notiz</th><th>ausgeblendet</th><th></th></tr></thead><tbody>'
+    +aus.map(f=>'<tr><td>'+esc(f.name)+'</td><td>'+esc(f.th||'—')+'</td><td>'+esc(f.ausbl.grund||'')+'</td><td>'+esc(f.ausbl.notiz||'')
+      +'</td><td class="re-leise">'+esc(f.ausbl.von||'')+(f.ausbl.am?', '+new Date(f.ausbl.am).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'')
+      +'</td><td><button class="re-btn" data-k="'+esc(reAusblKey(f))+'" onclick="reAusblAufheben(this.dataset.k)">wieder einblenden</button></td></tr>').join('')
+    +'</tbody></table>';
+  const fo=imZr.filter(f=>f.status==='folge');
+  if(fo.length)h+='<details style="margin-top:14px"><summary class="re-leise" style="cursor:pointer">'+fo.length
+    +' mit Folgetermin — die Therapie läuft weiter</summary><div class="re-leise" style="margin-top:6px">'
+    +fo.map(f=>esc(f.name)+(f.th?' ('+esc(f.th)+')':'')).join(' · ')+'</div></details>';
+  if(!imZr.length&&bI>=erster)h+='<div class="qm-empty">An diesem Tag stand niemand auf der Rezeptende-Liste.</div>';
+  if(ausMedifox)h+='<div class="re-leise" style="margin-top:14px">Quelle: Medifox, alle Termine je Rezept (nachts aktualisiert). '
+    +'„Mit Folgetermin“ heißt: Nach dem letzten Termin des Rezepts steht schon ein weiterer Termin oder eine Reservierung.</div>';
+  h+='<div class="re-leise" style="margin-top:14px">Gezählt wird jeder Fall am Tag seines letzten Termins. '
+    +'Zuordnung Patient → Fragebogen über den Namen; ab dem ersten Gespräch '
+    +'über die Id aus MyWellness. Überfällig heißt: '+RE_FRIST+' Werktage nach dem letzten Termin noch kein Fragebogen.</div>';
+  return h;
+}
+
+// ── Gespraeche aus MyWellness ────────────────────────────────────────────
+// Die Verteilung steht immer vollstaendig da — auch "kein Interesse" ist eine
+// Antwort und keine Luecke. Neben jeder Zeile steht, was sie fuer die Reise
+// bedeutet: Ziel, unterwegs, wartet, beendet.
+let MW={stufe:0};
+function mwSetStufe(n){MW.stufe=n;rClub();}
+function mwGespraeche(von,bis,ortRe){
+  const alle=(D.mw||[]).filter(r=>!ortRe||!r.standort||ortRe.test(r.standort));
+  if(!alle.length){
+    return '<div class="qm-note">Für diesen Standort liegen keine Gesprächsdaten aus MyWellness vor. '
+      +'Der Flow legt sie stündlich unter <b>'+esc(MW_DIR)+'&lt;Standort&gt;/</b> ab.</div>';
+  }
+  // Standortfilter wie im uebrigen Dashboard, aber nur wenn Ordner da sind.
+  const orte=[...new Set(alle.map(r=>r.standort).filter(Boolean))];
+  let R=alle.filter(r=>r.dt>=von&&r.dt<=bis);
+  if(MW.stufe)R=R.filter(r=>r.stufe===MW.stufe);
+
+  const stufen=[...new Set(alle.map(r=>r.stufe).filter(x=>x))].sort();
+
+  let h='';
+  h+='<div class="mw-kopf"><b>🗣️ Gespräche</b> <small>aus MyWellness · '
+    +R.length+' im gewählten Zeitraum</small></div>';
+  h+='<div class="cl-per" style="margin-bottom:10px">'
+    +[[0,'alle Gespräche']].concat(stufen.map(n=>[n,n+'. Gespräch']))
+      .map(([k,l])=>`<button class="fp${MW.stufe===k?' a':''}" onclick="mwSetStufe(${k})">${esc(l)}</button>`).join('')
+    +'</div>';
+
+  if(!R.length){
+    h+='<div class="qm-empty">In diesem Zeitraum wurde kein Gespräch erfasst.</div>';
+    return h;
+  }
+  // Verteilung
+  const z={};R.forEach(r=>{z[r.erg]=(z[r.erg]||0)+1;});
+  const reihe=MW_ERG.concat([MW_UNBEKANNT]).filter(e=>z[e.k]);
+  const ab=R.filter(r=>r.erg==='club').length;
+  const quote=Math.round(1000*ab/R.length)/10;
+  h+='<div class="mw-quote"><div class="mw-q-zahl">'+String(quote).replace('.',',')+' %</div>'
+    +'<div class="mw-q-txt"><b>'+ab+' von '+R.length+' Gesprächen</b> enden in einer '
+    +'Club-Mitgliedschaft — dem Ziel der Reise</div></div>';
+  const max=Math.max(...reihe.map(e=>z[e.k]));
+  h+='<table class="mw-tab"><tbody>'+reihe.map(e=>{
+    const n=z[e.k],p=Math.round(1000*n/R.length)/10;
+    const a=mwArt(e.k);
+    return '<tr'+(e.k==='club'?' class="ab"':'')+'><td>'
+      +'<span class="mw-pkt" style="background:'+MW_ART[a].f+'"></span>'+esc(e.l)+'</td>'
+      +'<td class="mw-bal"><span style="width:'+Math.round(100*n/max)+'%;background:'
+      +MW_ART[a].f+'"></span></td>'
+      +'<td class="mw-n">'+n+'</td><td class="mw-p">'+String(p).replace('.',',')+' %</td>'
+      +'<td class="mw-wo">'+esc(MW_ART[a].l)+'</td></tr>';
+  }).join('')+'</tbody></table>';
+  // ── Die Reise je Person ────────────────────────────────────────────────
+  const reisen=mwReisen(R);
+  const stufenDa=[...new Set(R.map(r=>r.stufe).filter(x=>x))].sort();
+  h+='<div class="mw-kopf" style="margin-top:22px"><b>🧭 Reise</b> <small>'
+    +reisen.length+' Person'+(reisen.length===1?'':'en')+' · verbunden über die Id aus MyWellness</small></div>';
+
+  if(stufenDa.length<2){
+    h+='<div class="qm-note">Bisher liegen nur Exporte für das '
+      +(stufenDa[0]||1)+'. Gespräch vor. Sobald die Exporte für das 2. und 3. Gespräch '
+      +'daneben liegen, zeigt sich hier der Weg je Person — wer nach dem Präventionskurs '
+      +'in den Club geht, und an welcher Stelle jemand verlorengeht.</div>';
+  }
+
+  // Trichter: wie viele Personen erreichen welche Stufe
+  const maxSt=Math.max(1,...stufenDa);
+  h+='<table class="mw-tab mw-trich"><tbody>';
+  for(let st=1;st<=maxSt;st++){
+    const dran=reisen.filter(x=>x.schritte.some(r=>r.stufe===st)).length;
+    const breit=reisen.length?Math.round(100*dran/reisen.length):0;
+    h+='<tr><td>'+st+'. Gespräch</td><td class="mw-bal"><span style="width:'+breit+'%"></span></td>'
+      +'<td class="mw-n">'+dran+'</td><td class="mw-p">'+breit+' %</td></tr>';
+  }
+  h+='</tbody></table>';
+
+  // Wo die Reise gerade steht — der Absprungpunkt
+  const jeArt={};reisen.forEach(x=>{jeArt[x.art]=(jeArt[x.art]||0)+1;});
+  h+='<div class="mw-kopf" style="margin-top:16px"><b>Wo die Reise gerade steht</b></div>';
+  h+='<table class="mw-tab"><tbody>'+Object.keys(MW_ART).filter(k=>jeArt[k]).map(k=>{
+    const n=jeArt[k],p=Math.round(1000*n/reisen.length)/10;
+    return '<tr><td><span class="mw-pkt" style="background:'+MW_ART[k].f+'"></span>'
+      +esc(MW_ART[k].l)+'</td><td class="mw-bal"><span style="width:'
+      +Math.round(100*n/reisen.length)+'%;background:'+MW_ART[k].f+'"></span></td>'
+      +'<td class="mw-n">'+n+'</td><td class="mw-p">'+String(p).replace('.',',')+' %</td></tr>';
+  }).join('')+'</tbody></table>';
+  const fest=reisen.filter(x=>x.art==='haengt');
+  if(fest.length)h+='<div class="mw-tun"><b>'+fest.length+' Person'
+    +(fest.length===1?' hängt':'en hängen')+' fest.</b> Das vereinbarte Folgegespräch kam seit über '+MW_WARTEZEIT
+    +' Tagen nicht, oder die Rückmeldung des Therapeuten fehlt — hier geht die Reise weiter, '
+    +'wenn jemand anruft: '+fest.slice(0,15).map(x=>esc(x.name)+' <span style="opacity:.75">('
+      +(x.letzte.erg==='norueck'?'keine Rückmeldung':'Folgegespräch seit '+Math.floor((new Date()-x.letzte.dt)/864e5)+' Tagen')+')</span>').join(' · ')
+    +(fest.length>15?' …':'')+'</div>';
+  const nW=reisen.filter(x=>x.art==='wartet').length;
+  if(nW)h+='<div class="re-leise" style="margin-top:6px">'+nW+' Person'+(nW===1?' wartet':'en warten')
+    +' noch innerhalb der '+MW_WARTEZEIT+' Tage auf ihr Folgegespräch.</div>';
+
+  // Uebergaenge: was wurde aus welchem Ergebnis
+  const ueber={};
+  reisen.forEach(x=>{for(let i=0;i+1<x.schritte.length;i++){
+    const k=x.schritte[i].erg+'→'+x.schritte[i+1].erg;
+    ueber[k]=(ueber[k]||0)+1;}});
+  const uk=Object.keys(ueber).sort((a,b)=>ueber[b]-ueber[a]);
+  if(uk.length){
+    const nm=k=>{const e=MW_ERG.concat([MW_UNBEKANNT]).find(x=>x.k===k);return e?e.l:k;};
+    h+='<div class="mw-kopf" style="margin-top:16px"><b>Übergänge</b> '
+      +'<small>was aus einem Ergebnis im nächsten Gespräch wurde</small></div>';
+    h+='<table class="mw-tab"><tbody>'+uk.slice(0,12).map(k=>{
+      const[a,b]=k.split('→');
+      return '<tr><td>'+esc(nm(a))+' <span class="mw-pfeil">→</span> <b>'+esc(nm(b))+'</b></td>'
+        +'<td class="mw-n">'+ueber[k]+'</td></tr>';}).join('')+'</tbody></table>';
+  }
+
+  // Bei "Sonstige" steht der eigentliche Inhalt in der Anmerkung — ohne sie
+  // weiss niemand, was los ist.
+  const so=R.filter(r=>r.erg==='sonst').sort((a,b)=>b.dt-a.dt);
+  if(so.length)h+='<div class="mw-kopf" style="margin-top:16px"><b>„Sonstige“ — Anmerkungen</b> <small>'+so.length+' im Zeitraum</small></div>'
+    +'<table class="re-tab"><tbody>'+so.map(r=>'<tr><td style="white-space:nowrap">'+r.dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})
+      +'</td><td style="white-space:nowrap">'+esc(r.name)+'<div class="re-leise">'+(r.stufe?r.stufe+'. Gespräch':'')+'</div></td><td>'
+      +(r.notiz?'„'+esc(r.notiz)+'“':r.notiz===''?'<span class="re-leise">keine Anmerkung eingetragen</span>'
+        :'<span class="re-leise">Anmerkung noch nicht abgerufen</span>')+'</td></tr>').join('')+'</tbody></table>';
+  if(z[MW_UNBEKANNT.k])h+='<div class="qm-note">'+z[MW_UNBEKANNT.k]
+    +'× eine Antwort, die das Dashboard nicht kennt. Wurde der Fragebogen geändert? '
+    +'Dann muss die Liste der Antworten nachgezogen werden.</div>';
+  if(!orte.length)h+='<div class="qm-note">Die Exporte liegen ohne Standort-Unterordner. '
+    +'Solange das so ist, zeigt die Auswertung alle Standorte zusammen.</div>';
+  return h;
+}
+function clCard(titel,cls,data,von,bis){
+  const head=sub=>`<div class="cl-card"><div class="cl-card-h ${cls}"><span>🏋️ ${titel}</span><small>${sub}</small></div><div class="cl-body">`;
+  if(!data)return head('Weekly KPI Tracker · Blatt „Therapiemanger“')+'<div class="qm-note">Blatt „Therapiemanger“ nicht gefunden oder nicht lesbar – keine Zahlen angezeigt.</div></div></div>';
+  const fD=d=>d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+  const last=data.days.length?data.days[data.days.length-1].dt:null;
+  const first=data.days.length?data.days[0].dt:null;
+  let h=head('Weekly KPI Tracker · Therapiemanger'+(last?' · letzter Eintrag '+last.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):''));
+  const inP=data.days.filter(d=>d.dt>=von&&d.dt<=bis);
+  const sum=k=>{let n=0,has=false;inP.forEach(d=>{const x=d.v[k];if(x&&x.n!==null){n+=x.n;has=true;}});return has?n:null;};
+  const abCols=data.cols.filter(c=>c.ab);
+  let abS=0,abHas=false;abCols.forEach(c=>{const v=sum(c.k);if(v!==null){abS+=v;abHas=true;}});
+  const fmt=v=>v===null?'—':String(Math.round(v*10)/10).replace('.',',');
+  h+='<div class="cl-tiles">'+data.cols.map(c=>`<div class="cl-tile${c.k==='club'?' hl':''}"><div class="v">${fmt(sum(c.k))}</div><div class="l">${c.l}</div></div>`).join('')
+    +`<div class="cl-tile hl"><div class="v">${abHas?fmt(abS):'—'}</div><div class="l">Abschlüsse gesamt<br>(${abCols.map(c=>c.kz||c.l).join(' + ')})</div></div></div>`;
+  // Werktage ohne jede Eintragung (ab erstem Eintrag, bis heute) – ausweisen statt als 0 zählen
+  const heute=new Date();heute.setHours(0,0,0,0);
+  const have=new Set(data.days.map(d=>d.dt.getTime()));
+  const gaps=[];for(let d=new Date(Math.max(von,first||von));d<=bis&&d<heute;d.setDate(d.getDate()+1)){const wd=d.getDay();if(wd===0||wd===6)continue;if(!have.has(d.getTime()))gaps.push(new Date(d));}
+  // Tagesansicht (Woche) bzw. Wochenverlauf (4 Wochen / Jahr)
+  const kc=data.cols;
+  const cell=x=>!x?'':x.n===null?`<span class="txt">${esc(x.note)}</span>`:fmt(x.n)+(x.note?` <span class="nt" title="${esc(x.note)}">•</span>`:'');
+  if(clTageweise()){
+    h+='<div class="cl-sub">Tage</div><div class="cl-tw"><table><thead><tr><th>Tag</th>'+kc.map(c=>`<th>${c.l}</th>`).join('')+'</tr></thead><tbody>';
+    for(let d=new Date(von);d<=bis;d.setDate(d.getDate()+1)){const e=inP.find(x=>x.dt.getTime()===d.getTime());
+      h+=`<tr><td>${fD(d)}</td>`+kc.map(c=>`<td>${e?cell(e.v[c.k]):''}</td>`).join('')+'</tr>';}
+    h+='</tbody></table></div>';
+  }else{
+    const wk={};inP.forEach(d=>{const w=kwOf(d.dt),key=w.jahr*100+w.kw;(wk[key]=wk[key]||{w,ds:[]}).ds.push(d);});
+    const keys=Object.keys(wk).sort((a,b)=>b-a);
+    h+='<div class="cl-sub">Wochenverlauf</div><div class="cl-tw"><table><thead><tr><th>KW</th>'+kc.map(c=>`<th>${c.l}</th>`).join('')+'</tr></thead><tbody>';
+    h+=keys.map(k=>{const{w,ds}=wk[k];return`<tr><td>KW ${w.kw}</td>`+kc.map(c=>{let n=0,has=false;ds.forEach(d=>{const x=d.v[c.k];if(x&&x.n!==null){n+=x.n;has=true;}});return`<td>${has?fmt(n):''}</td>`;}).join('')+'</tr>';}).join('')||`<tr><td colspan="${kc.length+1}" class="txt">Keine Einträge im Zeitraum.</td></tr>`;
+    h+='</tbody></table></div>';
+  }
+  // Anmerkungen aus den Zellen (Freitext neben der Zahl bzw. Urlaub/frei)
+  const notes=[];inP.forEach(d=>kc.forEach(c=>{const x=d.v[c.k];if(x&&x.note&&x.n!==null)notes.push(`<b>${fD(d.dt)}</b> · ${c.l}: ${fmt(x.n)} – ${esc(x.note)}`);}));
+  if(notes.length)h+='<div class="cl-sub">Anmerkungen</div><div class="cl-notes">'+notes.join('<br>')+'</div>';
+  if(gaps.length)h+=`<div class="qm-note" style="margin:14px 0 0">${gaps.length} Werktag${gaps.length>1?'e':''} ohne Eintragung${clTageweise()?': '+gaps.map(fD).join(', '):''} (Feiertage nicht herausgerechnet) – fließen nicht als 0 ein.</div>`;
+  return h+'</div></div>';
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// CLUB-GESPRAECHE AUS MYWELLNESS
+// ═══════════════════════════════════════════════════════════════════════════
+// Im CRM haengt an jedem Gespraech (1., 2., 3.) ein Fragebogen mit einer
+// Pflichtfrage: "Ergebnis des Gesprächs". Der Export ist eine CSV mit
+//   Datum;Ergebnis des Gesprächs;Name;Email;Id Cloud
+// und einer Zeile je Person und Gespraech.
+//
+// Zwei Dinge stehen NICHT in den Zeilen:
+//   - die Gespraechsstufe. Sie steckt im Dateinamen ("1. Gespräch_…csv").
+//   - der Standort. Deshalb liegt je Standort ein Unterordner.
+// Ablage:  12_Code/Controlling/MyWellness/<Standort>/<Export>.csv
+// Wer eine neue Datei ablegt, muss nichts weiter tun — gelesen wird der
+// ganze Ordner.
+const MW_DIR='12_Code/Controlling/MyWellness/';
+
+// Die elf Antworten des Fragebogens. Der Export liefert sie mit Anfuehrungs-
+// zeichen und angehaengten Leerzeichen ('"Nicht geeignet"/ Therapeut hat
+// abgeraten '), deshalb wird auf Muster geprueft und nicht auf Gleichheit.
+// `ab` markiert, was ein verkauftes Angebot ist — welche davon als Abschluss
+// zaehlen, entscheidet die Auswahl in der Ansicht, nicht diese Tabelle.
+const MW_ERG=[
+  {k:'club',    l:'Club-Mitgliedschaft',        ab:true,  re:/club.?mitglied/i},
+  // Die Zahl steht mal hinter dem Wort ("Präventionskurs 8x"), mal davor
+  // ("16 - Wochen Präventionskurs 1x/Woche", "8x Präventionskurs …"). Gesucht
+  // wird deshalb nur, ob 8 oder 16 irgendwo frei dasteht — die "1x/Woche"
+  // dahinter darf nicht mitzaehlen.
+  {k:'praev8',  l:'Präventionskurs 8 Wochen',   ab:true,  re:/(?=.*pr[aä]vention)(?=.*(^|\D)8(\D|$))/i},
+  {k:'praev16', l:'Präventionskurs 16 Wochen',  ab:true,  re:/(?=.*pr[aä]vention)(?=.*(^|\D)16(\D|$))/i},
+  {k:'rv',      l:'R+V Fit',                    ab:true,  re:/r\s*\+\s*v/i},
+  {k:'trena',   l:'T-Rena',                     ab:true,  re:/t-?rena/i},
+  {k:'folgeg',  l:'Folgegespräch',              ab:false, re:/folgegespr/i},
+  {k:'folgerez',l:'Folgerezept',                ab:false, re:/folgerezept/i},
+  {k:'kein',    l:'Kein Interesse / trainiert bereits', ab:false, re:/kein\s*interesse|trainiert\s*bereits/i},
+  {k:'norueck', l:'Keine Rückmeldung vom Therapeuten', ab:false, re:/keine\s*r[üu]ckmeldung/i},
+  {k:'ungeeig', l:'„Nicht geeignet" / abgeraten',ab:false, re:/nicht\s*geeignet|abgeraten/i},
+  {k:'sonst',   l:'Sonstige',                   ab:false, re:/^sonstige/i}
+];
+// Was keinem Muster entspricht, verschwindet nicht — es bekommt einen eigenen
+// Platz. Eine neue Antwort im Fragebogen faellt so auf, statt still zu fehlen.
+const MW_UNBEKANNT={k:'unbekannt',l:'nicht zugeordnet',ab:false};
+function mwErg(txt){
+  const s=String(txt||'').replace(/^["\s]+|["\s]+$/g,'');
+  if(!s)return null;
+  return MW_ERG.find(e=>e.re.test(s))||MW_UNBEKANNT;
+}
+// "1. Gespräch_22.09.2026_22.10.2026.csv" -> 1
+function mwStufe(name){
+  const m=String(name||'').match(/(\d)\s*\.\s*gespr/i);
+  return m?+m[1]:null;
+}
+// "19.10.26 11:38" — zweistelliges Jahr, Tag zuerst.
+function mwDatum(s){
+  const m=String(s||'').trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if(!m)return null;
+  const j=+m[3]<100?2000+ +m[3]:+m[3];
+  const d=new Date(j,+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0));
+  return isNaN(d.getTime())?null:d;
+}
+// Eine Exportdatei in Saetze zerlegen. Semikolon-CSV mit Anfuehrungszeichen.
+function pMW(text,dateiname,standort){
+  if(!text)return[];
+  const stufe=mwStufe(dateiname);
+  const zeilen=mwCsv(text);
+  if(zeilen.length<2)return[];
+  // Zwei Kopfzeilen-Fassungen, und sie sind nicht gleich: Die aus der
+  // Oberflaeche heruntergeladene Datei schreibt "Datum;…;Name;Email", die
+  // Antwort der Schnittstelle dagegen Platzhalter — ":date:", ":name:",
+  // ":email:". Nur "Ergebnis des Gesprächs" und "Id Cloud" heissen in beiden
+  // gleich. Deshalb wird auf mehrere Schreibweisen geprueft; wer nur eine
+  // kennt, bekommt beim Umstieg auf den Flow eine leere Liste.
+  const hdr=zeilen[0].map(h=>String(h||'').replace(/^\uFEFF/,'').replace(/^[":\s]+|[":\s]+$/g,'').toLowerCase());
+  const sp=(...n)=>hdr.findIndex(h=>n.some(x=>h.indexOf(x)===0));
+  const iD=sp('datum','date'),
+        iN=sp('name'),iM=sp('email','e-mail'),iI=sp('id cloud','idcloud','id');
+  // Die Antwortspalte traegt den Text der Frage, und der ist je Bogen anders:
+  // im 1. Gespraech "Ergebnis des Gesprächs", im 2. "Frage 1". Was nicht
+  // Datum, Name, Mail oder Id ist, ist die Antwort.
+  let iE=sp('ergebnis','result');
+  if(iE<0)iE=hdr.findIndex((h,i)=>h&&![iD,iN,iM,iI].includes(i));
+  if(iD<0||iE<0)return[];
+  const out=[];
+  for(let r=1;r<zeilen.length;r++){
+    const z=zeilen[r];if(!z||!z.length)continue;
+    const dt=mwDatum(z[iD]);if(!dt)continue;
+    const e=mwErg(z[iE]);if(!e)continue;
+    out.push({dt,stufe,erg:e.k,ergText:String(z[iE]||'').replace(/^["\s]+|["\s]+$/g,''),
+      name:iN>=0?String(z[iN]||'').trim():'',
+      mail:iM>=0?String(z[iM]||'').trim():'',
+      id:iI>=0?String(z[iI]||'').trim():'',
+      standort:standort||''});
+  }
+  return out;
+}
+// ── Die Reise einer Person ───────────────────────────────────────────────
+// Je Person koennen ein bis drei Gespraeche stattfinden, und der Weg dazwischen
+// ist die eigentliche Frage: Wer nach dem Praeventionskurs in den Club geht,
+// ist etwas anderes als wer nach dem ersten Gespraech nicht mehr auftaucht.
+// Verbunden werden die Gespraeche ueber die "Id Cloud" — sie ist je Person
+// stabil, der Name dagegen steht mal als "Nachname Vorname", mal umgekehrt.
+//
+// Vier Arten, wie eine Reise gerade dasteht:
+//   abschluss — das letzte Gespraech endete mit einem verkauften Angebot
+//   raus      — kein Interesse oder nicht geeignet: bewusst beendet
+//   wartet    — Folgegespraech oder Folgerezept vereinbart, aber es kam
+//                keines mehr. DAS ist der Absprungpunkt, an dem jemand
+//                etwas tun kann
+//   haengt    — "keine Rueckmeldung von Therapeuten": kein Absprung des
+//                Kunden, sondern eine Luecke im eigenen Ablauf
+// Das Ziel ist immer die Club-Mitgliedschaft. Erst dort ist die Reise zu Ende.
+// Ein Praeventionskurs, R+V Fit oder T-Rena sind KEIN Abschluss, sondern eine
+// Station: Die Person ist gewonnen, aber noch nicht im Club — sie muss wieder
+// angesprochen werden, wenn der Kurs ausläuft. Wer das als Abschluss zaehlt,
+// verliert genau die Leute aus dem Blick, bei denen der naechste Schritt
+// faellig ist.
+const MW_ART={
+  ziel     :{l:'Im Club — Reise abgeschlossen', f:'#1d7a4e'},
+  unterwegs:{l:'Unterwegs zum Club',            f:'#0e7c86'},
+  wartet   :{l:'Wartet auf das Folgegespräch',  f:'#d98a2b'},
+  therapie :{l:'Zurück in Therapie (Folgerezept)',f:'#5b6fb3'},
+  beendet  :{l:'Beendet ohne Club',             f:'#6b7785'},
+  haengt   :{l:'Hängt fest',                    f:'#c03b35'},
+  unklar   :{l:'Unklar',                        f:'#95a1ad'}
+};
+function mwArt(erg){
+  if(erg==='club')return'ziel';
+  if(erg==='praev8'||erg==='praev16'||erg==='rv'||erg==='trena')return'unterwegs';
+  if(erg==='kein'||erg==='ungeeig')return'beendet';
+  // Folgerezept: Der Patient ist wieder in Therapie, das naechste Gespraech
+  // kommt am Ende des neuen Rezepts — er steht dann wieder auf der Liste.
+  if(erg==='folgerez')return'therapie';
+  if(erg==='folgeg')return'wartet';
+  if(erg==='norueck')return'haengt';
+  return'unklar';
+}
+// Offen heisst: die Reise kann noch im Club enden. Das sind die Leute, bei
+// denen sich ein Anruf lohnt.
+const MW_OFFEN=['unterwegs','wartet','haengt'];
+// Ein vereinbartes Folgegespraech darf eine Woche auf sich warten lassen;
+// danach haengt die Reise fest. Fehlt die Rueckmeldung des Therapeuten,
+// haengt sie sofort.
+const MW_WARTEZEIT=7;
+function mwReisen(saetze,jetzt){
+  const p={};
+  (saetze||[]).forEach(r=>{
+    const k=r.id||('@'+r.name+'|'+r.standort);
+    (p[k]=p[k]||{id:r.id,name:r.name,standort:r.standort,schritte:[]}).schritte.push(r);
+  });
+  return Object.values(p).map(x=>{
+    // Nach Stufe sortieren; ohne Stufe entscheidet das Datum.
+    x.schritte.sort((a,b)=>(a.stufe||99)-(b.stufe||99)||a.dt-b.dt);
+    const letzt=x.schritte[x.schritte.length-1];
+    x.letzte=letzt;
+    x.art=mwArt(letzt.erg);
+    if(x.art==='wartet'&&((jetzt||new Date())-letzt.dt)>MW_WARTEZEIT*864e5)x.art='haengt';
+    x.tiefe=x.schritte.length;
+    x.maxStufe=Math.max(...x.schritte.map(r=>r.stufe||0));
+    // Hat die Person irgendwann etwas abgeschlossen — auch wenn danach noch
+    // ein Gespraech kam? Fuer "wie viele wurden am Ende Mitglied" zaehlt der
+    // beste erreichte Stand, nicht nur der letzte.
+    // Wer einmal im Club ist, bleibt am Ziel — auch wenn danach noch ein
+    // Gespraech gefuehrt wurde.
+    x.club=x.schritte.some(r=>r.erg==='club');
+    if(x.club)x.art='ziel';
+    x.offen=MW_OFFEN.indexOf(x.art)>=0;
+    // Welche Stationen die Person unterwegs genommen hat.
+    x.stationen=x.schritte.filter(r=>mwArt(r.erg)==='unterwegs').map(r=>r.erg);
+    return x;
+  });
+}
+// Zwei Exporte mit ueberlappendem Zeitraum enthalten dieselben Gespraeche.
+// Die "Id Cloud" ist je Person stabil, und je Person und Stufe gibt es genau
+// ein Gespraech — daraus laesst sich das Doppelte sicher erkennen. Behalten
+// wird der juengste Satz, denn ein spaeterer Export kann ein korrigiertes
+// Ergebnis tragen. Ohne Id bleibt der Satz stehen: lieber einmal zu viel in
+// der Liste als ein Gespraech, das stillschweigend verschwindet.
+// Schluessel fuer eine Anmerkung: Person (Id aus MyWellness), Gespraechsstufe
+// und Tag. datum ist ein Date (aus der CSV) oder "22.10.2026 11:49:58" (aus
+// der Anmerkungsdatei).
+function mwNotizKey(id,stufe,datum){
+  if(!id||!stufe)return null;
+  let d=datum;
+  if(!(d instanceof Date))d=mwDatum(String(datum||''));
+  if(!d||isNaN(d))return null;
+  return String(id).trim()+'|'+stufe+'|'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+}
+// Haengt jede Anmerkung an ihr Gespraech. notiz bleibt undefined, wenn keine
+// abgerufen wurde, und ist '', wenn im Fragebogen nichts eingetragen war.
+function mwNotizenAnhaengen(saetze,notizen){
+  (saetze||[]).forEach(r=>{const k=mwNotizKey(r.id,r.stufe,r.dt);if(k&&Object.prototype.hasOwnProperty.call(notizen,k))r.notiz=notizen[k];});
+  return saetze;
+}
+function mwOhneDoppel(saetze){
+  const seen={},out=[];
+  saetze.forEach(r=>{
+    if(!r.id){out.push(r);return;}
+    const k=r.id+'|'+r.stufe;
+    const alt=seen[k];
+    if(!alt){seen[k]=r;out.push(r);return;}
+    if(r.dt>alt.dt){out[out.indexOf(alt)]=r;seen[k]=r;}
+  });
+  return out;
+}
+// Kleiner CSV-Leser: Semikolon, doppelte Anfuehrungszeichen als Maskierung.
+function mwCsv(text){
+  const rows=[];let f='',row=[],q=false;
+  const t=String(text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if(c==='"')q=true;
+    else if(c===';'){row.push(f);f='';}
+    else if(c==='\n'){row.push(f);f='';if(row.some(x=>x!==''))rows.push(row);row=[];}
+    else f+=c;
+  }
+  row.push(f);if(row.some(x=>x!==''))rows.push(row);
+  return rows;
+}
+
+// --- Was sich gar nicht kontrollieren laesst ------------------------------
+// Der Kriterienkatalog fragt nach Befundaufbau, Zielen, Technik und
+// Trainingsparametern. Auf einen Praeventionskurs, einen Clubtermin oder eine
+// Warmpackung laesst sich keine dieser Fragen anwenden — dort gibt es weder
+// einen Therapiebefund noch eine Massnahmendokumentation in diesem Sinn. Wer
+// solche Termine trotzdem in die Stichprobe legt, misst nicht die Qualitaet,
+// sondern erzeugt eine Luecke, die niemand schliessen kann.
+//
+// Betrifft fast nur Kitzingen/PhFiP: In den Werneck-Exporten kommen diese
+// Bezeichnungen nicht vor (geprueft am 19.10.2026 ueber alle Terminplaene).
+// Die Muster stammen aus den tatsaechlichen Bezeichnungen des F4-Exports,
+// nicht aus Annahmen.
+const QM_AUSSEN=[
+  // Kurse und Praevention: kein Heilmittel, keine Verordnung, kein Befund.
+  {k:'kurs',l:'Kurse & Prävention',
+   re:/pr[aä]vention|\bclub\b|r\s*\+\s*v\s*fit|t-?rena|reha-?sport|funktionstraining/i},
+  // Platzhalter im Kalender — gar keine Behandlung.
+  {k:'platz',l:'Platzhalter',re:/^\s*reserviert\s*$|^\s*blocker\s*$|^\s*intern\s*$/i},
+  // Passive Waermeanwendungen. Sie sind ergaenzende Heilmittel und werden
+  // neben einem vorrangigen erbracht; eine eigene Befund- oder
+  // Massnahmendokumentation mit Technik und Trainingsparametern gibt es dazu
+  // nicht. Der Termin selbst ist damit nicht nach diesem Katalog bewertbar.
+  {k:'waerme',l:'Wärme & passive Anwendungen',
+   re:/warmpackung|hei[sß]+e\s*rolle|^\s*w[aä]rme\s*$|fango|heissluft|hei[sß]luft|rotlicht/i}
+];
+function qmAussen(lst){
+  const s=String(lst||'');
+  if(!s.trim())return null;              // ohne Bezeichnung wird nichts unterstellt
+  const tr=QM_AUSSEN.find(g=>g.re.test(s));
+  return tr?tr:null;
+}
+
+// --- Wochen-Daten: Ersttermine + Doku-Kandidaten ---
+function qmWeekBounds(kw,jahr){const j4=new Date(jahr,0,4);const mo=new Date(j4);mo.setDate(j4.getDate()-(j4.getDay()+6)%7+(kw-1)*7);mo.setHours(0,0,0,0);const so=new Date(mo);so.setDate(mo.getDate()+6);so.setHours(23,59,59,999);return{mo,so};}
+function qmWeekData(){
+  // Regionsfilter: Allgemein = beide Quellen, sonst nur Kitzingen (Excel/F4) bzw. Werneck (thevea)
+  let T=(D.qmTermine||[]).filter(t=>REG==='Allgemein'||(t.region||'Kitzingen')===REG);
+  // Feinauswahl (Standort-Pills): nur Termine des gewählten Standorts/Bereichs
+  // Kitzingen via Teams-Sheet-Lookup, Werneck direkt aus _wp/_we-Export (auch KIMOJO)
+  if(aF!=='Alle')T=T.filter(t=>qmSoMatch(t.standort));
+  if(QM.kw===null){const c=kwOf(new Date());QM.kw=c.kw;QM.jahr=c.jahr;}
+  const{mo,so}=qmWeekBounds(QM.kw,QM.jahr);
+  // Ersttermine, zwei Wege:
+  //  1) Sichere Flags (erst===true) aus F4-Wochenkalender (Position 1) und Werneck-Historie (frühester Tag je VO)
+  //  2) Excel-Altbestand (erst===undefined): Heuristik frühester Termin je Rezeptnr. + Exportfenster-Schutz
+  // Nicht kontrollierbare Termine fliegen raus, werden aber gezaehlt: eine
+  // stillschweigend gekuerzte Stichprobe waere wieder eine erfundene Zahl.
+  const ausGez={};
+  const inWoche=t=>t.dt>=mo&&t.dt<=so&&!t.dup;
+  T.forEach(t=>{if(!inWoche(t))return;const a=qmAussen(t.lst);
+    if(a)ausGez[a.k]=(ausGez[a.k]||0)+1;});
+  T=T.filter(t=>!qmAussen(t.lst));
+  const flagged=T.filter(t=>t.erst===true&&!t.dup&&t.dt>=mo&&t.dt<=so);
+  const legacy=T.filter(t=>t.erst===undefined);
+  const dataMin=legacy.length?new Date(Math.min(...legacy.map(t=>t.dt.getTime()))):null;
+  const byPos={};legacy.forEach(t=>{if(!t.pos)return;if(!byPos[t.pos]||t.dt<byPos[t.pos].dt||(t.dt.getTime()===byPos[t.pos].dt.getTime()&&t.uz<byPos[t.pos].uz))byPos[t.pos]=t;});
+  const guard=dataMin?new Date(dataMin.getTime()+3*864e5):null;
+  const erstL=Object.values(byPos).filter(t=>!t.dup&&t.dt>=mo&&t.dt<=so&&(!guard||t.dt>guard));
+  // Zustaendigkeit: eingeloggte Leitung sieht nur die ihr zugeteilten Therapeut:innen
+  const erst=flagged.concat(erstL).filter(t=>qmMein(t.th));
+  erst.sort((a,b)=>a.dt-b.dt||a.uz.localeCompare(b.uz));
+  // Doku: alle Therapeuten mit Terminen in der Woche, je 1 Termin (deterministisch zufällig)
+  const wk=T.filter(t=>t.dt>=mo&&t.dt<=so&&!t.dup&&t.th&&t.th!=='—'&&qmMein(t.th));
+  // Werneck-Termine ohne belegte Zuordnung (vor Archiv-Start) – werden ausgewiesen, nicht geraten
+  const naW=T.filter(t=>t.dt>=mo&&t.dt<=so&&!t.dup&&t.region==='Werneck'&&t.th==='—').length;
+  const byTh={};wk.forEach(t=>{if(!byTh[t.th])byTh[t.th]=[];byTh[t.th].push(t);});
+  // Rotation: am längsten nicht doku-kontrollierte Therapeuten zuerst
+  const lastCtrl={};QM.data.kontrollen.filter(k=>k.typ==='doku').forEach(k=>{const d=new Date(k.datum);if(!lastCtrl[k.therapeut]||d>lastCtrl[k.therapeut])lastCtrl[k.therapeut]=d;});
+  const doku=Object.entries(byTh).map(([th,ts])=>{
+    const pick=ts[Math.floor(seedRnd(th+'|'+QM.kw+'|'+QM.jahr)*ts.length)];
+    // ts = alle Termine der Woche (chronologisch) – zur Auswahl, falls der Vorschlag nicht passt
+    return{th,t:pick,ts:[...ts].sort((a,b)=>a.dt-b.dt||a.uz.localeCompare(b.uz)),last:lastCtrl[th]||null};
+  });
+  doku.sort((a,b)=>{const la=a.last?a.last.getTime():0,lb=b.last?b.last.getTime():0;return la-lb||a.th.localeCompare(b.th);});
+  // Befund-Vorschlag: deterministisch 5 aus allen Ersttermine der Woche.
+  // Termine ohne belegte Therapeut:in kommen nicht infrage – sie sind nicht kontrollierbar.
+  const shuf=erst.filter(t=>t.th&&t.th!=='—').sort((a,b)=>seedRnd(a.pos+'|'+QM.kw)-seedRnd(b.pos+'|'+QM.kw));
+  const suggB=new Set(shuf.slice(0,QM_ZIEL).map(t=>t.pos));
+  return{mo,so,erst,doku,suggB,dataMin,naW,ausGez};
+}
+// Erledigte Kontrollen der Woche. Fuer eine eingeloggte Leitung zaehlen nur die
+// eigenen – das 5/5-Ziel gilt je Leitung, nicht fuer das Team zusammen.
+function qmDone(typ){const me=qmMe();
+  return QM.data.kontrollen.filter(k=>k.typ===typ&&k.kw===QM.kw&&k.jahr===QM.jahr&&(REG==='Allgemein'||(k.region||'Kitzingen')===REG)&&(!me||!QM.nurMeine||k.leitung===me.mail));}
+function qmChW(d){if(QM.kw===null)return;let kw=QM.kw+d,j=QM.jahr;if(kw<1){j--;kw=kwOf(new Date(j,11,28)).kw;}else if(kw>kwOf(new Date(j,11,28)).kw){j++;kw=1;}const cur=kwOf(new Date());if(j>cur.jahr||(j===cur.jahr&&kw>cur.kw))return;QM.kw=kw;QM.jahr=j;QM.showAllB=false;QM.showAllD=false;QM.openD={};rQM();}
+
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtD=d=>d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});
+// Anzeige-Kurzform der Rezept-/Verordnungs-ID (GUIDs aus Medifox F4 kürzen)
+const posShort=p=>{p=String(p||'');const m=p.match(/^F4-([0-9a-f]{8})-/i);return m?'F4-'+m[1]:p;};
+
+// --- Render: Wochenansicht ---
+function rQM(){
+  if(!document.getElementById('qmListB'))return;
+  rQMWho();rQMCfg();
+  const{mo,so,erst,doku,suggB,naW,ausGez}=qmWeekData();
+  const cur=kwOf(new Date());
+  document.getElementById('qmKwT').textContent='KW '+QM.kw+(QM.jahr!==cur.jahr?' / '+QM.jahr:'');
+  document.getElementById('qmKwI').textContent=mo.toLocaleDateString('de-DE',{day:'numeric',month:'short'})+' – '+so.toLocaleDateString('de-DE',{day:'numeric',month:'short'})+(QM.kw===cur.kw&&QM.jahr===cur.jahr?' · laufende Woche':'')+(REG!=='Allgemein'?' · '+REG:'')+(aF!=='Alle'?' · '+aF:'');
+  const dB=qmDone('befund'),dD=qmDone('doku');
+  const cb=document.getElementById('qmCntB'),cd=document.getElementById('qmCntD');
+  cb.innerHTML='📋 Befunde <span class="qm-num">'+dB.length+'/'+QM_ZIEL+'</span>';cb.classList.toggle('done',dB.length>=QM_ZIEL);
+  cd.innerHTML='📝 Dokus <span class="qm-num">'+dD.length+'/'+QM_ZIEL+'</span>';cd.classList.toggle('done',dD.length>=QM_ZIEL);
+  // Befund-Liste
+  // Standort-/Bereichs-Tag: Allgemein → Standort (+ Werneck-Marker), Werneck → nur Physio/Ergo
+  const soTag=t=>REG==='Allgemein'?' · '+esc(t.standort||'')+(t.region==='Werneck'?' (Werneck)':''):REG==='Werneck'?' · '+esc(String(t.standort||'').replace(/^(KIMOJO|Werneck)\s*/,'')):'';
+  const doneB={};dB.forEach(k=>{doneB[k.posNr]=k;});
+  let listB=[...erst];
+  if(!QM.showAllB&&listB.length>8){const vis=listB.filter(t=>suggB.has(t.pos)||doneB[t.pos]);var hidB=listB.length-vis.length;listB=vis;}
+  const bh=listB.map(t=>{
+    const k=doneB[t.pos];
+    // Einheitlich mit der Doku-Spalte: oben Therapeut:in, darunter Patient:in + Termin
+    if(k){const st=qmStufe(k.prozent);return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(t.th)}</div><div class="qm-t2">${esc(t.pat)} · ${fmtD(t.dt)} ${t.uz} · Rp. ${esc(posShort(t.pos))}${soTag(t)}</div></div><span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${k.prozent}%</span></div>`;}
+    // Ohne belegte Zuordnung keine Kontrolle – sonst landet '—' als Therapeut:in in der Historie
+    if(t.th==='—')return`<div class="qm-item na"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">Therapeut:in nicht belegt</div><div class="qm-t2">${esc(t.pat)} · ${fmtD(t.dt)} ${t.uz} · Rp. ${esc(posShort(t.pos))}${soTag(t)}</div></div></div>`;
+    return`<div class="qm-item${suggB.has(t.pos)?' sugg':''}" onclick="qmOpen('befund','${esc(t.pos)}')"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(t.th)}</div><div class="qm-t2">${esc(t.pat)} · ${fmtD(t.dt)} ${t.uz} · Rp. ${esc(posShort(t.pos))}${soTag(t)}</div></div>${suggB.has(t.pos)?'<span class="qm-tag">Vorschlag</span>':''}</div>`;
+  }).join('');
+  // Was aus der Stichprobe genommen wurde, steht ueber der Liste. Ein Filter,
+  // der schweigt, laesst die Liste leer aussehen statt sauber.
+  const ausSum=Object.keys(ausGez||{}).reduce((n,k)=>n+ausGez[k],0);
+  const ausHint=ausSum>0?`<div class="qm-note">${ausSum} Termin${ausSum===1?'':'e'} dieser Woche `
+    +`<b>nicht kontrollierbar</b> und deshalb aus der Stichprobe genommen: `
+    +QM_AUSSEN.filter(g=>ausGez[g.k]).map(g=>`${ausGez[g.k]}× ${esc(g.l)}`).join(' · ')
+    +`. Der Kriterienkatalog fragt nach Befundaufbau, Zielen und Maßnahmen — darauf `
+    +`gibt es bei Kursen, Platzhaltern und passiven Wärmeanwendungen keine Antwort.</div>`:'';
+  const naHint=ausHint+(naW>0?`<div class="qm-note"><b>${naW} Termine dieser Woche ohne Therapeuten-Zuordnung.</b> Bei diesen Terminen ist in thevea kein Mitarbeiter eingetragen. Sie bleiben leer, statt geraten zu werden.</div>`:'');
+  // Bei fehlender Zuordnung erklaert der Hinweis die leere Liste – dann kein zweites "nichts gefunden"
+  document.getElementById('qmListB').innerHTML=naHint+(bh||(naW>0?'':'<div class="qm-empty">Keine Ersttermine in dieser Woche gefunden.</div>'))+(!QM.showAllB&&typeof hidB!=='undefined'&&hidB>0?`<div class="qm-more" onclick="QM.showAllB=true;rQM()">+ ${hidB} weitere Ersttermine anzeigen</div>`:'');
+  // Doku-Liste
+  const doneD={};dD.forEach(k=>{doneD[k.therapeut]=k;});
+  let listD=[...doku];
+  if(!QM.showAllD&&listD.length>8){const vis=listD.slice(0,QM_ZIEL).concat(listD.slice(QM_ZIEL).filter(x=>doneD[x.th]));var hidD=listD.length-vis.length;listD=vis;}
+  // Je Termin erledigt? (Therapeut:in + Tag + Uhrzeit + Patient:in) – erlaubt weitere Kontrollen derselben Person
+  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const doneT={};dD.forEach(k=>{doneT[k.therapeut+'|'+k.terminDatum+'|'+k.uhrzeit+'|'+k.patient]=k;});
+  const dh=listD.map((x,i)=>{
+    const k=doneD[x.th];const idx=doku.indexOf(x);
+    const thA=esc(x.th).replace(/'/g,"\\'");
+    const lastTxt=x.last?'zuletzt '+x.last.toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'2-digit'}):'noch nie kontrolliert';
+    const open=!!QM.openD[x.th];
+    const alt=x.ts.length>1?`<span class="qm-alt" onclick="event.stopPropagation();qmTogD('${thA}')">${x.ts.length} Termine ${open?'▴':'▾'}</span>`:'';
+    const sub=open&&x.ts.length>1?'<div class="qm-sub">'+x.ts.map((t,ti)=>{
+      const kt=doneT[x.th+'|'+ymd(t.dt)+'|'+t.uz+'|'+t.pat];
+      const t2=`${fmtD(t.dt)} ${t.uz}${t.lst?' · '+esc(t.lst):''}`;
+      if(kt){const st=qmStufe(kt.prozent);return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(t.pat)}</div><div class="qm-t2">${t2}</div></div><span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${kt.prozent}%</span></div>`;}
+      return`<div class="qm-item" onclick="qmOpen('doku','${thA}',${ti})"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(t.pat)}</div><div class="qm-t2">${t2}</div></div>${t===x.t?'<span class="qm-tag">Vorschlag</span>':''}</div>`;
+    }).join('')+'</div>':'';
+    if(k){const st=qmStufe(k.prozent);const kd=k.terminDatum?fmtD(new Date(k.terminDatum+'T00:00'))+' '+(k.uhrzeit||''):fmtD(x.t.dt)+' '+x.t.uz;return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(x.th)}</div><div class="qm-t2">${esc(k.patient||x.t.pat)} · ${kd}</div></div>${alt}<span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${k.prozent}%</span></div>${sub}`;}
+    return`<div class="qm-item${idx<QM_ZIEL?' sugg':''}" onclick="qmOpen('doku','${thA}')"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(x.th)}</div><div class="qm-t2">${esc(x.t.pat)} · ${fmtD(x.t.dt)} ${x.t.uz}${soTag(x.t)} · ${lastTxt}</div></div>${alt}${idx<QM_ZIEL?'<span class="qm-tag">Dran</span>':''}</div>${sub}`;
+  }).join('');
+  document.getElementById('qmListD').innerHTML=naHint+(dh||(naW>0?'':'<div class="qm-empty">Keine Termine in dieser Woche gefunden.</div>'))+(!QM.showAllD&&typeof hidD!=='undefined'&&hidD>0?`<div class="qm-more" onclick="QM.showAllD=true;rQM()">+ ${hidD} weitere Therapeut:innen anzeigen</div>`:'');
+  rQMAn();
+}
+
+// --- Wer ist angemeldet + Zuteilungs-Panel ---
+function rQMWho(){
+  const el=document.getElementById('qmWho');if(!el)return;
+  let h='';
+  if(QMHIST.n>0&&QMHIST.ohneMa===QMHIST.n)h+=`<div class="qm-note">⚠️ <b>Der Historien-Export enthält kein Mitarbeiter-Feld</b> (${QMHIST.n} Termine, 0 mit Zuordnung). Dadurch bleiben alle vergangenen Wochen ohne Therapeut:in. Ursache ist der Power-Automate-Flow „Werneck Historie" – bitte bei Kilian melden.</div>`;
+  const me=qmMe();
+  if(me){
+    const n=Object.values(qmZu()).filter(v=>v===me.mail).length;
+    h+=n===0
+      ?`<div class="qm-note">👤 Angemeldet als <b>${esc(me.kurz)}</b> – aber noch <b>keine Therapeut:innen zugeteilt</b>. Über <b>⚙️ Zuteilung</b> festlegen, wer zu ${esc(me.kurz)} gehört, sonst bleiben die Wochenlisten leer.</div>`
+      :`<div class="qm-who">👤 Angemeldet als <b>${esc(me.kurz)}</b> · ${QM.nurMeine?n+' zugeteilte Therapeut:innen · Ziel '+QM_ZIEL+' Befunde + '+QM_ZIEL+' Dokus':'Ansicht: gesamtes Team'}<button class="qm-cfg-btn" style="margin-left:10px;padding:3px 10px" onclick="QM.nurMeine=!QM.nurMeine;rQM()">${QM.nurMeine?'alle anzeigen':'nur meine'}</button></div>`;
+  }
+  el.innerHTML=h;
+}
+function rQMCfg(){
+  const el=document.getElementById('qmCfg');if(!el)return;
+  if(!QM.cfgOpen){el.innerHTML='';return;}
+  // Auswahlliste = alle Therapeut:innen, die in der aktuellen Region/Standortauswahl Termine haben
+  const set=new Set();
+  (D.qmTermine||[]).forEach(t=>{
+    if(!t.th||t.th==='—'||t.dup)return;
+    if(REG!=='Allgemein'&&(t.region||'Kitzingen')!==REG)return;
+    if(aF!=='Alle'&&!qmSoMatch(t.standort))return;
+    set.add(t.th);
+  });
+  const ths=[...set].sort((a,b)=>a.localeCompare(b,'de'));
+  const z=qmZu();
+  const jsStr=s=>esc(s).replace(/'/g,"\\'");
+  const rows=ths.map(th=>{
+    const cur=z[th]||'';
+    const btns=QM_LEITUNG.map(l=>`<button class="${cur===l.mail?'a':''}" onclick="qmSetZu('${jsStr(th)}','${l.mail}')">${esc(l.kurz)}</button>`).join('')
+      +`<button class="${cur?'':'a'}" onclick="qmSetZu('${jsStr(th)}','')">—</button>`;
+    return`<div class="qm-cfg-row"><span class="nm">${esc(th)}</span>${btns}</div>`;
+  }).join('');
+  const cnt=QM_LEITUNG.map(l=>l.kurz+': '+ths.filter(t=>z[t]===l.mail).length).join(' · ');
+  const off=ths.filter(t=>!z[t]).length;
+  // Erkannte Login-Adresse mit ausgeben: weicht der UPN im Tenant von den
+  // Adressen in QM_LEITUNG ab, scheitert die Erkennung sonst lautlos.
+  const mail=qmMail(),me=qmMe();
+  const who=me?`erkannt als <b>${esc(me.kurz)}</b>`:`<b>keiner Leitung zugeordnet</b> – diese Adresse steht nicht in <code>QM_LEITUNG</code>, daher volle Sicht auf alle Kontrollen`;
+  el.innerHTML=`<div class="qm-cfg"><h4>⚙️ Zuteilung · Therapeut:in → fachliche Leitung</h4>
+    <div class="hint">Wer kontrolliert wen? Gilt für beide Leitungen gemeinsam, gespeichert in <code>${QM_FILE}</code>. „—" = noch keiner Leitung zugeordnet – diese Personen erscheinen in keiner Wochenliste.<br>Angemeldet: <code>${esc(mail||'—')}</code> · ${who}</div>
+    <div class="qm-cfg-grid">${rows||'<div class="qm-empty">Keine Therapeut:innen in der aktuellen Auswahl.</div>'}</div>
+    <div class="qm-cfg-sum">${esc(cnt)}${off?' · '+off+' ohne Zuteilung':''}</div></div>`;
+}
+async function qmSetZu(th,mail){
+  const z=qmZu();
+  if(mail)z[th]=mail;else delete z[th];
+  rQM();
+  try{await qmSave();}catch(e){alert('Zuteilung konnte nicht gespeichert werden: '+e.message);}
+}
+
+// --- Fragebogen-Modal ---
+function qmTogD(th){QM.openD[th]=!QM.openD[th];rQM();}
+// ti (optional): Index eines frei gewählten Termins der Therapeut:in statt des Wochen-Vorschlags
+function qmOpen(typ,key,ti){
+  const{erst,doku}=qmWeekData();
+  let t;if(typ==='befund'){t=erst.find(x=>x.pos===key);}else{const e=doku.find(x=>x.th===key);t=e&&(ti!==undefined?e.ts[ti]:e.t);}
+  if(!t)return;
+  const K=QM_KRIT[typ];
+  QM.cur={typ,t,antworten:{},note:''};
+  const pruefer=(ml.getActiveAccount()||{}).name||'';
+  const qh=K.fragen.map(f=>`<div class="qm-q"><div class="qm-q-t">${esc(f.t)}</div><div class="qm-opts">${f.o.map((o,oi)=>`<span class="qm-opt" id="opt-${f.id}-${oi}" onclick="qmAns('${f.id}',${oi})">${esc(o[0])} <span style="opacity:.6;font-size:10px">+${o[1]}</span></span>`).join('')}</div></div>`).join('');
+  document.getElementById('qmModal').innerHTML=`
+    <div class="qm-m-h ${typ==='befund'?'bf':'dk'}"><h3>${K.icon} ${K.titel}</h3><p>KW ${QM.kw} · ${QM.jahr}</p></div>
+    <div class="qm-m-b">
+      <div class="qm-meta">
+        <div><span class="lbl">Therapeut:in</span><b>${esc(t.th)}</b></div>
+        <div><span class="lbl">Patient:in</span><b>${esc(t.pat)}</b></div>
+        <div><span class="lbl">Termin</span><b>${fmtD(t.dt)} ${t.uz}</b></div>
+        <div><span class="lbl">${typ==='befund'?'Rezept-Nr.':'Leistung'}</span><b>${esc(typ==='befund'?posShort(t.pos):(t.lst||'—'))}</b></div>
+        <div><span class="lbl">Prüfer:in</span><b>${esc(pruefer)}</b></div>
+        <div><span class="lbl">Prüfdatum</span><b>${new Date().toLocaleDateString('de-DE')}</b></div>
+      </div>
+      ${qh}
+      <div class="qm-live"><span style="font-size:12px;color:var(--muted)">Ergebnis</span><b id="qmLive">— / ${qmMax(typ)} Punkte</b></div>
+      <textarea class="qm-note" id="qmNote" placeholder="Anmerkung (optional) …"></textarea>
+    </div>
+    <div class="qm-m-f"><button class="qm-btn sec" onclick="qmClose()">Abbrechen</button><button class="qm-btn pri" id="qmSaveBtn" disabled onclick="qmSubmit()">Speichern</button></div>`;
+  document.getElementById('qmOv').classList.add('open');
+}
+function qmAns(fid,oi){
+  const K=QM_KRIT[QM.cur.typ];const f=K.fragen.find(x=>x.id===fid);
+  QM.cur.antworten[fid]={label:f.o[oi][0],pts:f.o[oi][1]};
+  f.o.forEach((o,i)=>{document.getElementById('opt-'+fid+'-'+i).classList.toggle('sel',i===oi);});
+  const all=K.fragen.every(x=>QM.cur.antworten[x.id]!==undefined);
+  const pts=Object.values(QM.cur.antworten).reduce((s,a)=>s+a.pts,0),mx=qmMax(QM.cur.typ);
+  const lv=document.getElementById('qmLive');
+  if(all){const p=Math.round(pts/mx*100);const st=qmStufe(p);lv.innerHTML=pts+' / '+mx+' Punkte · <span style="color:'+st.c+'">'+p+'% · '+st.n+'</span>';}
+  else lv.textContent=pts+' / '+mx+' Punkte';
+  document.getElementById('qmSaveBtn').disabled=!all;
+}
+function qmClose(){document.getElementById('qmOv').classList.remove('open');QM.cur=null;}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')qmClose();});
+async function qmSubmit(){
+  const c=QM.cur;if(!c)return;
+  const K=QM_KRIT[c.typ];const mx=qmMax(c.typ);
+  const pts=Object.values(c.antworten).reduce((s,a)=>s+a.pts,0);
+  const p=Math.round(pts/mx*100);
+  const rec={
+    id:Date.now()+'-'+Math.random().toString(36).slice(2,8),
+    typ:c.typ,therapeut:c.t.th,patient:c.t.pat,posNr:c.t.pos,leistung:c.t.lst,standort:c.t.standort,region:c.t.region||'Kitzingen',
+    terminDatum:c.t.dt.getFullYear()+'-'+String(c.t.dt.getMonth()+1).padStart(2,'0')+'-'+String(c.t.dt.getDate()).padStart(2,'0'),uhrzeit:c.t.uz,
+    kw:QM.kw,jahr:QM.jahr,datum:new Date().toISOString(),
+    pruefer:(ml.getActiveAccount()||{}).name||'',
+    leitung:qmMail(), // Login-E-Mail: macht das 5/5-Ziel je Leitung zaehlbar
+    antworten:Object.fromEntries(K.fragen.map(f=>[f.id,{frage:f.t,...c.antworten[f.id]}])),
+    punkte:pts,maxPunkte:mx,prozent:p,stufe:qmStufe(p).n,
+    anmerkung:document.getElementById('qmNote').value.trim()
+  };
+  const btn=document.getElementById('qmSaveBtn');btn.disabled=true;btn.textContent='Speichere…';
+  QM.data.kontrollen.push(rec);
+  try{await qmSave();qmClose();rQM();}
+  catch(e){btn.disabled=false;btn.textContent='Speichern';alert('Speichern fehlgeschlagen: '+e.message+'\nBitte erneut versuchen.');QM.data.kontrollen=QM.data.kontrollen.filter(k=>k.id!==rec.id);}
+}
+
+// --- Auswertung / Historie ---
+function qmAnFilter(){
+  let ks=QM.data.kontrollen.filter(k=>k.jahr===(QM.anZeit==='YTD'||Q_MAP[QM.anZeit]?new Date().getFullYear():k.jahr));
+  if(QM.anZeit==='Alles')ks=QM.data.kontrollen;
+  else if(Q_MAP[QM.anZeit]){const mns=Q_MAP[QM.anZeit].map(m=>MN.indexOf(m));ks=ks.filter(k=>mns.includes(new Date(k.datum).getMonth()));}
+  if(QM.anTyp!=='beide')ks=ks.filter(k=>k.typ===QM.anTyp);
+  if(REG!=='Allgemein')ks=ks.filter(k=>(k.region||'Kitzingen')===REG);
+  if(aF!=='Alle')ks=ks.filter(k=>qmSoMatch(k.standort));
+  return ks;
+}
+function qmTrend(list){ // Verlauf: Ø der letzten 3 vs. Ø der 3 davor
+  const s=[...list].sort((a,b)=>new Date(a.datum)-new Date(b.datum));
+  if(s.length<4)return null;
+  const rec=s.slice(-3),prev=s.slice(Math.max(0,s.length-6),s.length-3);
+  if(!prev.length)return null;
+  const a=rec.reduce((x,k)=>x+k.prozent,0)/rec.length,b=prev.reduce((x,k)=>x+k.prozent,0)/prev.length;
+  return a-b;
+}
+function rQMAn(){
+  const el=document.getElementById('qmAnTb');if(!el)return;
+  // Filter-Pills
+  let fh='<span class="fl">Typ</span>';
+  [['beide','Befund + Doku'],['befund','Befund'],['doku','Doku']].forEach(([k,l])=>{fh+=`<button class="fp${QM.anTyp===k?' a':''}" onclick="QM.anTyp='${k}';QM.anOpen=null;rQMAn()">${l}</button>`;});
+  fh+='<span class="sep"></span><span class="fl">Zeitraum</span>';
+  ['YTD','Q1','Q2','Q3','Q4','Alles'].forEach(z=>{fh+=`<button class="fp${QM.anZeit===z?' a':''}" onclick="QM.anZeit='${z}';QM.anOpen=null;rQMAn()">${z}</button>`;});
+  document.getElementById('qmAnFlt').innerHTML=fh;
+  const ks=qmAnFilter();
+  // Team-Zeile
+  const tb=ks.filter(k=>k.typ==='befund'),td=ks.filter(k=>k.typ==='doku');
+  const avg=a=>a.length?Math.round(a.reduce((s,k)=>s+k.prozent,0)/a.length):null;
+  const tlEl=document.getElementById('qmTeamLine');
+  const tAvgB=avg(tb),tAvgD=avg(td);
+  tlEl.innerHTML=`
+    <div class="qm-tl-item"><span class="lbl">Kontrollen gesamt</span><div class="val">${ks.length}</div></div>
+    <div class="qm-tl-item"><span class="lbl">ø Befund (Team)</span><div class="val" style="color:${tAvgB!==null?qmStufe(tAvgB).c:'var(--muted)'}">${tAvgB!==null?tAvgB+'%':'—'}</div></div>
+    <div class="qm-tl-item"><span class="lbl">ø Doku (Team)</span><div class="val" style="color:${tAvgD!==null?qmStufe(tAvgD).c:'var(--muted)'}">${tAvgD!==null?tAvgD+'%':'—'}</div></div>
+    <div class="qm-tl-item"><span class="lbl">Therapeut:innen geprüft</span><div class="val">${new Set(ks.map(k=>k.therapeut)).size}</div></div>`;
+  // Tabelle pro Therapeut
+  const byTh={};ks.forEach(k=>{if(!byTh[k.therapeut])byTh[k.therapeut]=[];byTh[k.therapeut].push(k);});
+  const rows=Object.entries(byTh).map(([th,list])=>{
+    const b=list.filter(k=>k.typ==='befund'),d=list.filter(k=>k.typ==='doku');
+    const last=list.reduce((m,k)=>new Date(k.datum)>new Date(m.datum)?k:m,list[0]);
+    return{th,list,n:list.length,ab:avg(b),ad:avg(d),tr:qmTrend(list),last};
+  }).sort((a,b)=>a.th.localeCompare(b.th));
+  el.innerHTML=rows.map(r=>{
+    const spark=[...r.list].sort((a,b)=>new Date(a.datum)-new Date(b.datum)).slice(-10).map(k=>{const st=qmStufe(k.prozent);return`<i title="${k.prozent}% · KW ${k.kw}" style="height:${Math.max(3,k.prozent*.22)}px;background:${st.c}"></i>`;}).join('');
+    const trH=r.tr===null?'<span style="color:var(--muted)">—</span>':r.tr>2?`<span class="qm-trend" style="color:var(--teal)">▲ +${Math.round(r.tr)}</span>`:r.tr<-2?`<span class="qm-trend" style="color:var(--red)">▼ ${Math.round(r.tr)}</span>`:'<span class="qm-trend" style="color:var(--muted)">→</span>';
+    const pill=v=>v===null?'—':`<span class="eph-badge ${qmStufe(v).cls}">${v}%</span>`;
+    const open=QM.anOpen===r.th;
+    let det='';
+    if(open){
+      const items=[...r.list].sort((a,b)=>new Date(b.datum)-new Date(a.datum)).map(k=>{
+        const st=qmStufe(k.prozent);
+        const dets=Object.values(k.antworten||{}).filter(a=>a.pts<2).map(a=>esc(a.frage.split('?')[0])+': '+esc(a.label)).join(' · ');
+        return`<div class="dr"><span>${QM_KRIT[k.typ].icon} ${k.typ==='befund'?'Befund':'Doku'} · KW ${k.kw}/${k.jahr} · ${esc(k.patient)}</span><span style="font-weight:700;color:${st.c}">${k.punkte}/${k.maxPunkte} · ${k.prozent}%</span>${dets?`<span style="width:100%;color:var(--muted);font-size:11px">Abzüge: ${dets}</span>`:''}${k.anmerkung?`<span style="width:100%;font-style:italic;color:var(--muted);font-size:11px">„${esc(k.anmerkung)}" – ${esc(k.pruefer)}</span>`:''}</div>`;
+      }).join('');
+      det=`<tr><td colspan="7" style="white-space:normal"><div class="qm-detail">${items}</div></td></tr>`;
+    }
+    return`<tr class="qm-hist-row" onclick="QM.anOpen=QM.anOpen==='${r.th.replace(/'/g,"\\'")}'?null:'${r.th.replace(/'/g,"\\'")}';rQMAn()"><td style="font-weight:700">${esc(r.th)} <span style="color:var(--muted);font-size:10px">${open?'▲':'▼'}</span></td><td style="text-align:center">${r.n}</td><td style="text-align:right">${pill(r.ab)}</td><td style="text-align:right">${pill(r.ad)}</td><td><span class="qm-spark">${spark}</span></td><td>${trH}</td><td style="font-size:11px;color:var(--muted)">${new Date(r.last.datum).toLocaleDateString('de-DE',{day:'numeric',month:'short'})}</td></tr>`+det;
+  }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Noch keine Kontrollen erfasst. Klicke oben auf einen Kandidaten, um die erste Kontrolle zu starten.</td></tr>';
+}
+
+</script>
+</body>
+</html>

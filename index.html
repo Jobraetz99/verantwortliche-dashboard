@@ -595,6 +595,16 @@ async function loadAll(){
         tx.forEach(t=>{try{const o=JSON.parse(String(t||'').replace(/^\uFEFF/,''));
           const k=mwNotizKey(o.id,mwStufe(o.stufe),o.datum);if(k)notizen[k]=String(o.notiz||'').trim();}catch(e){}});
       }
+      // Gruppen aus dem CRM (Club-Mitglieder, Praeventionskurse): je Gruppe
+      // eine Datei in <Standort>/Gruppen/.
+      for(const q of quellen){
+        const gd=(await kinder(q.pfad+'Gruppen/')).filter(x=>x.file&&/\.json$/i.test(x.name));
+        if(!gd.length)continue;
+        const gt=await Promise.all(gd.map(d=>tGet(q.pfad+'Gruppen/'+d.name)));
+        const gruppen=gt.map(mgParse).filter(Boolean);
+        const st=gd.map(d=>new Date(d.lastModifiedDateTime)).filter(t=>!isNaN(t)).sort((a,b)=>b-a)[0]||null;
+        if(gruppen.length)MG.orte[q.ort]={gruppen,stand:st};
+      }
       return mwNotizenAnhaengen(mwOhneDoppel(alle),notizen);
     })().catch(()=>[]);
     // Auf alles warten
@@ -1190,17 +1200,168 @@ function rClub(){
   el.innerHTML=h||'<div class="qm-empty">Für die aktuelle Auswahl gibt es keine Club-Daten.</div>';
 }
 function clOrt(k,titel,von,bis){
-  const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['strich','Strichliste (Excel)']];
+  const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['mitgl','Mitglieder'],['strich','Strichliste (Excel)']];
   const a=CL.ansicht[k];
   const ortRe=k==='w'?/werneck|kimojo/i:/kitzingen|phfip/i;
-  let body;
-  if(a==='reise')body=k==='w'?reAnsicht(['wp','we'],ortRe,von,bis):reKitzAnsicht(ortRe,von,bis);
-  else if(a==='gespr')body=mwGespraeche(von,bis,ortRe);
+  let body=mgLeiste(ortRe);
+  if(a==='reise')body+=k==='w'?reAnsicht(['wp','we'],ortRe,von,bis):reKitzAnsicht(ortRe,von,bis);
+  else if(a==='gespr')body+=mwGespraeche(von,bis,ortRe);
+  else if(a==='mitgl')body+=mgAnsicht(ortRe,von,bis);
   else body=clCard(titel,k,(D.club||{})[k==='w'?'W':'K'],von,bis);
   return '<div class="cr-ort"><div class="cl-card-h '+k+'"><span>🏋️ '+esc(titel)+'</span>'
     +'<div class="cr-tabs">'+reiter.map(([x,l])=>'<button class="'+(a===x?'a':'')
       +'" onclick="clAnsicht(\''+k+'\',\''+x+'\')">'+esc(l)+'</button>').join('')+'</div></div>'
     +'<div class="cr-body">'+body+'</div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLUB-MITGLIEDER (Gruppen im MyWellness-CRM)
+// ═══════════════════════════════════════════════════════════════════════════
+// Wer Club-Mitglied ist oder im Praeventionskurs steckt, steht im CRM als
+// Gruppe (Personen → Kontakte → Filter Gruppe). Der Flow legt je Club und
+// Gruppe stuendlich eine Datei ab:
+//   MyWellness/<Club>/Gruppen/<Gruppen-Id>.json                 aktueller Stand
+//   MyWellness/<Club>/Gruppen/Verlauf/<yyyy-MM>/<dd> <Id>.json   letzter Stand des Tages
+// Inhalt: {id,name,anzahl,stand,mitglieder:[{id,name}]}. Nur selbst angelegte
+// Gruppen — die automatischen ("Mit Programm", "Aktive Kunden" …) nicht.
+// Die Clubs benennen ihre Gruppen verschieden (Werneck "KIMOJO Club Starter
+// (1x pro Woche)", Kitzingen "Monatlich Kündbar Starter"), deshalb wird nach
+// Mustern sortiert.
+const MG_VERLAUF_AB='2026-10-28';
+const MG_ART=[
+  {k:'club',   l:'Club-Mitglieder',   re:/club|smart|starter|mitgliedschaft|k[uü]ndbar/i},
+  {k:'praev',  l:'Präventionskurse',  re:/pr[aä]vention/i},
+  {k:'weitere',l:'Weitere Gruppen',   re:/./}
+];
+// Praevention zuerst pruefen: "Präventionskurs … 1x" ist kein Club.
+function mgArt(name){
+  const s=String(name||'');
+  if(MG_ART[1].re.test(s))return 'praev';
+  if(MG_ART[0].re.test(s))return 'club';
+  return 'weitere';
+}
+// Starter = 1x pro Woche, Smart = 2x pro Woche — so steht es in Werneck im
+// Gruppennamen, Kitzingen nennt nur Starter/Smart.
+function mgFreq(name){
+  const s=String(name||'');
+  if(/(^|\D)2\s*x|smart/i.test(s))return 2;
+  if(/(^|\D)1\s*x|starter/i.test(s))return 1;
+  return 0;
+}
+// Je Art: Gruppen mit Mitgliedern, dazu die Zahl der Koepfe. Wer in zwei
+// Gruppen derselben Art steht, zaehlt einmal.
+function mgZusammen(gruppen){
+  const A={};
+  MG_ART.forEach(a=>{A[a.k]={k:a.k,l:a.l,gruppen:[],koepfe:0,freq:{1:0,2:0}};});
+  (gruppen||[]).forEach(g=>{if(g&&(+g.anzahl||0)>0)A[mgArt(g.name)].gruppen.push(g);});
+  Object.values(A).forEach(a=>{
+    a.gruppen.sort((x,y)=>String(x.name).localeCompare(String(y.name),'de'));
+    const ids=new Set();let ohneListe=0;
+    a.gruppen.forEach(g=>{
+      if(Array.isArray(g.mitglieder)&&g.mitglieder.length)g.mitglieder.forEach(m=>ids.add(m.id||m.name));
+      else ohneListe+=+g.anzahl||0;
+      const f=mgFreq(g.name);if(f)a.freq[f]+=+g.anzahl||0;
+    });
+    a.koepfe=ids.size+ohneListe;
+  });
+  return A;
+}
+// Veraenderung je Gruppe zwischen zwei Staenden: wer neu dabei ist, wer fehlt.
+function mgVergleich(alt,neu){
+  const byId={};(alt||[]).forEach(g=>{if(g)byId[g.id]=g;});
+  return (neu||[]).map(g=>{
+    const a=byId[g.id];
+    if(!a)return {id:g.id,delta:null,neu:[],raus:[]};
+    const ka=new Set((a.mitglieder||[]).map(m=>m.id)),kn=new Set((g.mitglieder||[]).map(m=>m.id));
+    return {id:g.id,delta:(+g.anzahl||0)-(+a.anzahl||0),
+      neu:(g.mitglieder||[]).filter(m=>!ka.has(m.id)).map(m=>m.name),
+      raus:(a.mitglieder||[]).filter(m=>!kn.has(m.id)).map(m=>m.name)};
+  });
+}
+function mgParse(t){
+  try{const o=JSON.parse(String(t||'').replace(/^﻿/,''));
+    return o&&o.id!=null?{id:o.id,name:String(o.name||''),anzahl:+o.anzahl||0,stand:o.stand||'',
+      mitglieder:Array.isArray(o.mitglieder)?o.mitglieder:[]}:null;}catch(e){return null;}
+}
+// Aktueller Stand je Club (beim Laden gefuellt) und Tagesstaende (bei Bedarf
+// nachgeladen, dann wird neu gezeichnet).
+const MG={orte:{},tage:{},monate:{}};
+function mgGraph(path,kinder){
+  const e=path.split('/').filter(s=>s).map(encodeURIComponent).join('/');
+  return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/`+(kinder?'children?$top=999':'content'),
+    {cache:'no-store',headers:{Authorization:'Bearer '+window._tk}})
+    .then(r=>r.ok?(kinder?r.json():r.text()):null).then(x=>kinder?((x&&x.value)||[]):x).catch(()=>kinder?[]:null);
+}
+function mgTag(ort,d){
+  const iso=reIso(d),key=ort+'|'+iso;
+  if(MG.tage[key])return MG.tage[key];
+  MG.tage[key]={status:'laedt'};
+  (async()=>{
+    const ym=iso.slice(0,7),dd=iso.slice(8,10),pfad=MW_DIR+ort+'/Gruppen/Verlauf/'+ym+'/';
+    const mk=ort+'|'+ym;
+    if(!MG.monate[mk])MG.monate[mk]=mgGraph(pfad,true);
+    const dateien=(await MG.monate[mk]).filter(x=>x.file&&x.name.startsWith(dd+' ')&&/\.json$/i.test(x.name));
+    const g=(await Promise.all(dateien.map(x=>mgGraph(pfad+x.name)))).map(mgParse).filter(Boolean);
+    MG.tage[key]=g.length?{status:'da',gruppen:g}:{status:'fehlt'};
+    rClub();
+  })().catch(()=>{MG.tage[key]={status:'fehlt'};rClub();});
+  return MG.tage[key];
+}
+function mgOrt(ortRe){return Object.keys(MG.orte).find(o=>ortRe.test(o))||null;}
+function mgDelta(d){
+  if(d==null)return '';
+  return d>0?'<span style="color:#1d7a4e;font-weight:600">+'+d+'</span>':d<0?'<span style="color:#c03b35;font-weight:600">'+d+'</span>':'<span class="re-leise">±0</span>';
+}
+// Die Leiste ueber jeder Ansicht: wie viele sind es jetzt.
+function mgLeiste(ortRe){
+  const ort=mgOrt(ortRe);if(!ort)return '';
+  const A=mgZusammen(MG.orte[ort].gruppen);
+  const zeile=g=>esc(g.name)+': <b>'+g.anzahl+'</b>';
+  const kachel=a=>!a.gruppen.length?'':'<div class="re-k" style="flex:1 1 220px"><b>'+a.koepfe+'</b><span>'+esc(a.l)
+    +((a.freq[1]||a.freq[2])?' · 1×/Woche '+a.freq[1]+' · 2×/Woche '+a.freq[2]:'')+'</span>'
+    +'<div class="re-leise" style="margin-top:4px;line-height:1.5">'+a.gruppen.map(zeile).join('<br>')+'</div></div>';
+  const st=MG.orte[ort].stand;
+  return '<div class="re-kacheln">'+kachel(A.club)+kachel(A.praev)+kachel(A.weitere)+'</div>'
+    +(st?'<div class="re-leise" style="margin:-8px 0 14px">CRM-Stand: '+st.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})
+      +' '+st.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Personen in mehreren Gruppen zählen einmal</div>':'');
+}
+// Die Ansicht "Mitglieder": Stand am Ende des gewaehlten Zeitraums gegen den
+// Tag davor — wer kam dazu, wer ist raus.
+function mgAnsicht(ortRe,von,bis){
+  const ort=mgOrt(ortRe);
+  if(!ort)return '<div class="qm-empty">Noch keine Gruppendaten aus dem CRM. Der Flow legt sie stündlich unter MyWellness/&lt;Club&gt;/Gruppen ab.</div>';
+  const heute=clHeute(),fD=d=>d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const ende=bis>=heute?{status:'da',gruppen:MG.orte[ort].gruppen,jetzt:true}:mgTag(ort,bis);
+  const vt=new Date(von);vt.setDate(vt.getDate()-1);
+  const vorher=reIso(vt)<MG_VERLAUF_AB?{status:'fehlt'}:mgTag(ort,vt);
+  let h='';
+  if(ende.status==='laedt'||vorher.status==='laedt')h+='<div class="re-leise">Lade Verlauf …</div>';
+  if(ende.status==='fehlt')return h+'<div class="qm-empty">Für den '+fD(bis)+' gibt es keinen Stand — der Verlauf wird seit dem '
+    +fD(reTag(MG_VERLAUF_AB))+' mitgeschrieben.</div>';
+  if(ende.status!=='da')return h;
+  const vgl=vorher.status==='da'?mgVergleich(vorher.gruppen,ende.gruppen):null;
+  const V={};(vgl||[]).forEach(v=>{V[v.id]=v;});
+  h+='<div class="re-leise" style="margin-bottom:8px">Stand '+(ende.jetzt?'jetzt':'am '+fD(bis))
+    +(vgl?' · Veränderung gegenüber '+fD(vt):vorher.status==='fehlt'?' · für den '+fD(vt)+' gibt es noch keinen Stand zum Vergleich':'')+'</div>';
+  const A=mgZusammen(ende.gruppen);
+  MG_ART.forEach(art=>{
+    const a=A[art.k];if(!a.gruppen.length)return;
+    h+='<div class="re-kopf">'+esc(a.l)+' <small>'+a.koepfe+' Personen</small></div><table class="re-tab"><tr><th>Gruppe</th><th class="n">Anzahl</th>'
+      +(vgl?'<th class="n">Veränderung</th><th>neu dabei / nicht mehr dabei</th>':'')+'</tr>';
+    a.gruppen.forEach(g=>{
+      const v=V[g.id];
+      h+='<tr><td><details><summary>'+esc(g.name)+'</summary><div class="re-leise" style="margin-top:4px">'
+        +(g.mitglieder||[]).map(m=>esc(m.name)).sort((x,y)=>x.localeCompare(y,'de')).join(', ')+'</div></details></td>'
+        +'<td class="n">'+g.anzahl+'</td>'
+        +(vgl?'<td class="n">'+(v?mgDelta(v.delta):'')+'</td><td class="re-weg">'
+          +(v&&v.delta===null?'<span class="re-leise">neue Gruppe</span>':'')
+          +(v&&v.neu.length?'<span style="color:#1d7a4e">+ '+v.neu.map(esc).join(', ')+'</span>':'')
+          +(v&&v.neu.length&&v.raus.length?'<br>':'')
+          +(v&&v.raus.length?'<span style="color:#c03b35">− '+v.raus.map(esc).join(', ')+'</span>':'')+'</td>':'')+'</tr>';
+    });
+    h+='</table>';
+  });
+  return h;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

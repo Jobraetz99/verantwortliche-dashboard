@@ -578,6 +578,11 @@ async function loadAll(){
       const alle=[];
       for(const q of quellen){
         const dateien=(await kinder(q.pfad)).filter(x=>x.file&&/\.csv$/i.test(x.name));
+        // Stand der Daten: die juengste Datei des Standorts. Der Flow laeuft
+        // stuendlich — wer sich wundert, warum ein Gespraech fehlt, soll sehen,
+        // wie alt die Daten sind.
+        dateien.forEach(d=>{const t=d.lastModifiedDateTime?new Date(d.lastModifiedDateTime):null;
+          if(t&&!isNaN(t)&&(!MW_STAND[q.ort]||t>MW_STAND[q.ort]))MW_STAND[q.ort]=t;});
         const texte=await Promise.all(dateien.map(d=>tGet(q.pfad+d.name)));
         dateien.forEach((d,i)=>{if(texte[i])alle.push(...pMW(texte[i],d.name,q.ort));});
       }
@@ -1557,7 +1562,8 @@ function reAnsicht(locIds,ortRe,von,bis,jetzt,tageQuelle){
   if(!imZr.length&&bI>=erster)h+='<div class="qm-empty">An diesem Tag stand niemand auf der Rezeptende-Liste.</div>';
   if(ausMedifox)h+='<div class="re-leise" style="margin-top:14px">Quelle: Medifox, alle Termine je Rezept (nachts aktualisiert). '
     +'„Mit Folgetermin“ heißt: Nach dem letzten Termin des Rezepts steht schon ein weiterer Termin oder eine Reservierung.</div>';
-  h+='<div class="re-leise" style="margin-top:14px">Gezählt wird jeder Fall am Tag seines letzten Termins. '
+  {const st=mwStandText(ortRe);if(st)h+='<div style="margin-top:14px">'+st+'</div>';}
+  h+='<div class="re-leise" style="margin-top:6px">Gezählt wird jeder Fall am Tag seines letzten Termins. '
     +'Zuordnung Patient → Fragebogen über den Namen; ab dem ersten Gespräch '
     +'über die Id aus MyWellness. Überfällig heißt: '+RE_FRIST+' Werktage nach dem letzten Termin noch kein Fragebogen.</div>';
   return h;
@@ -1585,6 +1591,7 @@ function mwGespraeche(von,bis,ortRe){
   let h='';
   h+='<div class="mw-kopf"><b>🗣️ Gespräche</b> <small>aus MyWellness · '
     +R.length+' im gewählten Zeitraum</small></div>';
+  {const st=mwStandText(ortRe);if(st)h+='<div style="margin:-4px 0 8px">'+st+'</div>';}
   h+='<div class="cl-per" style="margin-bottom:10px">'
     +[[0,'alle Gespräche']].concat(stufen.map(n=>[n,n+'. Gespräch']))
       .map(([k,l])=>`<button class="fp${MW.stufe===k?' a':''}" onclick="mwSetStufe(${k})">${esc(l)}</button>`).join('')
@@ -1870,6 +1877,17 @@ const MW_OFFEN=['unterwegs','wartet','haengt'];
 // danach haengt die Reise fest. Fehlt die Rueckmeldung des Therapeuten,
 // haengt sie sofort.
 const MW_WARTEZEIT=7;
+const MW_STAND={};
+function mwStandText(ortRe){
+  const t=Object.keys(MW_STAND).filter(o=>!ortRe||ortRe.test(o)).map(o=>MW_STAND[o]).sort((a,b)=>b-a)[0];
+  if(!t)return '';
+  const h=new Date();h.setHours(0,0,0,0);
+  const tag=t>=h?'heute':t.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+  const alt=(Date.now()-t)>2*3600e3;
+  return '<span class="re-leise"'+(alt?' style="color:#c03b35"':'')+'>MyWellness-Stand: '+tag+' '
+    +t.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · wird stündlich aktualisiert'
+    +(alt?' — älter als zwei Stunden, der Flow liefert nicht':'')+'</span>';
+}
 function mwReisen(saetze,jetzt){
   const p={};
   (saetze||[]).forEach(r=>{

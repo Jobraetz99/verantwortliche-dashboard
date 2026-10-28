@@ -85,10 +85,10 @@ table{width:100%;border-collapse:separate;border-spacing:0 3px;font-size:13px}th
   flex-wrap:wrap;align-items:center}
 .mw-tab{width:100%;border-collapse:collapse;font-size:13.5px}
 .mw-tab td{padding:5px 8px;border-bottom:1px solid #eceff2;vertical-align:middle}
-.mw-tab tr.ab td{font-weight:650}
+.mw-tab tr.ziel td{font-weight:650}
 .mw-bal{width:45%}
 .mw-bal span{display:block;height:9px;border-radius:5px;background:#d7dde3}
-.mw-tab tr.ab .mw-bal span{background:#1d7a4e}
+.mw-tab tr.ziel .mw-bal span{background:#1d7a4e}
 .mw-n{text-align:right;width:46px;font-variant-numeric:tabular-nums}
 .mw-p{text-align:right;width:62px;color:#6b7785;font-variant-numeric:tabular-nums}
 .mw-trich .mw-bal span{background:#1d7a4e}
@@ -157,6 +157,8 @@ table{width:100%;border-collapse:separate;border-spacing:0 3px;font-size:13px}th
 .cl-tw{overflow-x:auto}
 .cl-tw table{font-size:12px}.cl-tw td,.cl-tw th{padding:6px 8px;text-align:right}.cl-tw td:first-child,.cl-tw th:first-child{text-align:left}
 .cl-tw tbody tr{background:var(--bg)}
+.cl-strich thead th{white-space:normal;vertical-align:bottom;min-width:62px;line-height:1.25}
+.cl-tw tr.sum td{background:var(--teal-bg);font-weight:700}
 .cl-tw .txt{color:var(--muted);font-size:11px;font-style:italic}
 .cl-tw .nt{color:var(--amber);font-weight:700;cursor:help}
 .cl-notes{font-size:11px;color:var(--muted);line-height:1.6}
@@ -521,9 +523,6 @@ async function loadAll(){
     const teamsP=gS(dr.k,FI.kpi,'Teams').catch(()=>null);
     const kpiKP=gS(dr.k,FI.kpi,'KPI Tracking Therapie').catch(()=>null);
     const kpiPP=dr.p?gS(dr.p,FI.kpiP,'KPI Tracking Therapie').catch(()=>null):Promise.resolve(null);
-    // Club: Blatt "Therapiemanger" (so geschrieben) in beiden Trackern – Name per Muster suchen, falls es korrigiert wird
-    const clubLoad=(d,f)=>d?gSN(d,f).then(sn=>{const n=sn.find(x=>/therapiemana?ger/i.test(x));return n?gS(d,f,n):null;}).catch(()=>null):Promise.resolve(null);
-    const clubKP=clubLoad(dr.k,FI.kpi),clubPP=clubLoad(dr.p,FI.kpiP);
     const auslKP=gS(dr.k,FI.kpi,'Auslastung').catch(()=>null);
     const auslPP=dr.p?gS(dr.p,FI.kpiP,'Auslastung').catch(()=>null):Promise.resolve(null);
     const fbP=gS(dr.k,FI.fb,'Sheet1').catch(()=>null);
@@ -680,8 +679,6 @@ async function loadAll(){
     if(auslP)D.auslP=pAusl(auslP);
     const aKWs=[...D.auslK.map(d=>d.kw),...D.auslP.map(d=>d.kw)];sKW=Math.min(cKW()-1,aKWs.length?Math.max(...aKWs):cKW()-1);
     if(fb)D.fb=pFB(fb);
-    const [clK,clP]=await Promise.all([clubKP,clubPP]);
-    D.club={W:pClub(clK),K:pClub(clP)};
     D.bwaK=bwaK;D.bwaP=bwaP;
     ld.classList.add('h');document.getElementById('db').style.display='block';render();
   }catch(e){lt.textContent='Fehler: '+e.message;console.error(e);}
@@ -1089,52 +1086,6 @@ function qmSoMatch(standort){const so=String(standort||'');
   if(aF==='KIMOJO Physio')return so==='KIMOJO Physio'||so==='Werneck Physio';
   if(aF==='KIMOJO Ergo')return so==='KIMOJO Ergo'||so==='Werneck Ergo';
   return so===aF;}
-// ===================================================================
-//  CLUB · Therapiemanager – Tagesliste aus den Weekly-KPI-Trackern
-//  Werneck = KIMOJO-Tracker (FI.kpi), Kitzingen = PHFIP-Tracker (FI.kpiP)
-// ===================================================================
-// Spalten werden über die Kopfzeile erkannt, nicht über die Position (Werneck hat zwei Spalten mehr)
-const CL_COLS=[
-  {k:'gespr',l:'Gespräche geführt',re:/gespr[aä]ch/i},
-  {k:'praev',l:'Präventionskurse',kz:'Prävention',re:/pr[aä]vention/i,ab:1},
-  {k:'club',l:'Club-Mitgliedschaften',kz:'Club',re:/club/i,ab:1},
-  {k:'trena',l:'T-RENA',re:/t-?rena/i,ab:1},
-  {k:'rv',l:'R+V Fit',re:/r\s*\+\s*v/i,ab:1},
-  {k:'nicht',l:'Nicht abgeschlossen',re:/nicht\s*abgeschl/i},
-  {k:'frez',l:'Folgerezept',re:/folge\s*rezept/i},
-  {k:'fterm',l:'Folgetermin',re:/folgetermin/i},
-  {k:'ern',l:'Ernährung',re:/ern[aä]hrung/i},
-  {k:'abgel',l:'Therapeut:in abgelehnt',re:/abgelehnt/i},
-  {k:'nang',l:'Nicht erreicht',re:/angetroffen|r[uü]ckmeldung/i}
-];
-// Zelle lesen wie eingetragen: Zahl · "2 (1x wsl Club)" → 2 + Notiz · reiner Text (Urlaub, Wochenende, frei) → nur Notiz
-function clCell(v){
-  if(v===null||v===undefined)return null;
-  if(typeof v==='number')return{n:v,note:''};
-  const s=String(v).trim();if(!s)return null;
-  const m=s.match(/^(\d+(?:[.,]\d+)?)\s*\+?\s*(.*)$/);
-  if(m)return{n:parseFloat(m[1].replace(',','.')),note:m[2].replace(/^\((.*)\)$/,'$1').trim()};
-  return{n:null,note:s};
-}
-function clDate(v){
-  if(typeof v==='number'&&v>40000){const d=new Date(Math.round((v-25569)*864e5));return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());}
-  const m=String(v||'').match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
-  if(m){const y=parseInt(m[3]);return new Date(y<100?2000+y:y,parseInt(m[2])-1,parseInt(m[1]));}
-  return null;
-}
-function pClub(rows){
-  if(!rows||rows.length<2)return null;
-  const hdr=(rows[0]||[]).map(h=>String(h||'').trim());
-  const di=hdr.findIndex(h=>/^datum$/i.test(h));if(di<0)return null;
-  const map=[];hdr.forEach((h,i)=>{if(!h)return;const c=CL_COLS.find(c=>c.re.test(h));if(c&&!map.some(x=>x.c===c))map.push({c,i});});
-  map.sort((a,b)=>CL_COLS.indexOf(a.c)-CL_COLS.indexOf(b.c));
-  const days=[];
-  for(let r=1;r<rows.length;r++){const row=rows[r];if(!row)continue;const dt=clDate(row[di]);if(!dt)continue;
-    const v={};let any=false;map.forEach(({c,i})=>{const x=clCell(row[i]);if(x){v[c.k]=x;any=true;}});
-    if(any)days.push({dt,v});}
-  days.sort((a,b)=>a.dt-b.dt);
-  return{cols:map.map(x=>x.c),days};
-}
 // Zeitleiste des Club-Reiters: ein Tag, eine Woche oder ein frei gewaehlter
 // Zeitraum. Die Ansicht je Standort merkt sich, welcher Reiter offen ist.
 let CL={modus:'T',tag:null,von:null,bis:null,ansicht:{w:'reise',k:'reise'}};
@@ -1200,14 +1151,14 @@ function rClub(){
   el.innerHTML=h||'<div class="qm-empty">Für die aktuelle Auswahl gibt es keine Club-Daten.</div>';
 }
 function clOrt(k,titel,von,bis){
-  const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['mitgl','Mitglieder'],['strich','Strichliste (Excel)']];
+  const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['mitgl','Mitglieder'],['strich','Strichliste']];
   const a=CL.ansicht[k];
   const ortRe=k==='w'?/werneck|kimojo/i:/kitzingen|phfip/i;
   let body=mgLeiste(ortRe);
   if(a==='reise')body+=k==='w'?reAnsicht(['wp','we'],ortRe,von,bis):reKitzAnsicht(ortRe,von,bis);
   else if(a==='gespr')body+=mwGespraeche(von,bis,ortRe);
   else if(a==='mitgl')body+=mgAnsicht(ortRe,von,bis);
-  else body=clCard(titel,k,(D.club||{})[k==='w'?'W':'K'],von,bis);
+  else body+=mwStrich(von,bis,ortRe);
   return '<div class="cr-ort"><div class="cl-card-h '+k+'"><span>🏋️ '+esc(titel)+'</span>'
     +'<div class="cr-tabs">'+reiter.map(([x,l])=>'<button class="'+(a===x?'a':'')
       +'" onclick="clAnsicht(\''+k+'\',\''+x+'\')">'+esc(l)+'</button>').join('')+'</div></div>'
@@ -1656,7 +1607,7 @@ function reAnsicht(locIds,ortRe,von,bis,jetzt,tageQuelle){
     const max=Math.max(...reihe.map(e=>z[e.k]));
     h+='<div class="re-kopf">Ergebnis der Gespräche <small>Stand der Reise je Person</small></div>'
       +'<table class="mw-tab"><tbody>'+reihe.map(e=>{const a=mwArt(e.k);
-        return '<tr'+(e.k==='club'?' class="ab"':'')+'><td><span class="mw-pkt" style="background:'+MW_ART[a].f+'"></span>'+esc(e.l)+'</td>'
+        return '<tr'+(mwIstClub(e.k)?' class="ziel"':'')+'><td><span class="mw-pkt" style="background:'+MW_ART[a].f+'"></span>'+esc(e.l)+'</td>'
           +'<td class="mw-bal"><span style="width:'+Math.round(100*z[e.k]/max)+'%;background:'+MW_ART[a].f+'"></span></td>'
           +'<td class="mw-n">'+z[e.k]+'</td><td class="mw-wo">'+esc(MW_ART[a].l)+'</td></tr>';}).join('')+'</tbody></table>';
   }
@@ -1765,7 +1716,7 @@ function mwGespraeche(von,bis,ortRe){
   // Verteilung
   const z={};R.forEach(r=>{z[r.erg]=(z[r.erg]||0)+1;});
   const reihe=MW_ERG.concat([MW_UNBEKANNT]).filter(e=>z[e.k]);
-  const ab=R.filter(r=>r.erg==='club').length;
+  const ab=R.filter(r=>mwIstClub(r.erg)).length;
   const quote=Math.round(1000*ab/R.length)/10;
   h+='<div class="mw-quote"><div class="mw-q-zahl">'+String(quote).replace('.',',')+' %</div>'
     +'<div class="mw-q-txt"><b>'+ab+' von '+R.length+' Gesprächen</b> enden in einer '
@@ -1774,7 +1725,7 @@ function mwGespraeche(von,bis,ortRe){
   h+='<table class="mw-tab"><tbody>'+reihe.map(e=>{
     const n=z[e.k],p=Math.round(1000*n/R.length)/10;
     const a=mwArt(e.k);
-    return '<tr'+(e.k==='club'?' class="ab"':'')+'><td>'
+    return '<tr'+(mwIstClub(e.k)?' class="ziel"':'')+'><td>'
       +'<span class="mw-pkt" style="background:'+MW_ART[a].f+'"></span>'+esc(e.l)+'</td>'
       +'<td class="mw-bal"><span style="width:'+Math.round(100*n/max)+'%;background:'
       +MW_ART[a].f+'"></span></td>'
@@ -1857,44 +1808,63 @@ function mwGespraeche(von,bis,ortRe){
     +'Solange das so ist, zeigt die Auswertung alle Standorte zusammen.</div>';
   return h;
 }
-function clCard(titel,cls,data,von,bis){
-  const head=sub=>`<div class="cl-card"><div class="cl-card-h ${cls}"><span>🏋️ ${titel}</span><small>${sub}</small></div><div class="cl-body">`;
-  if(!data)return head('Weekly KPI Tracker · Blatt „Therapiemanger“')+'<div class="qm-note">Blatt „Therapiemanger“ nicht gefunden oder nicht lesbar – keine Zahlen angezeigt.</div></div></div>';
+// ── Strichliste aus MyWellness ───────────────────────────────────────────
+// Ersetzt die Excel-Strichliste (Blatt "Therapiemanger"), die nicht mehr
+// gepflegt wird. Gezaehlt wird jeder Fragebogen im CRM: ein Gespraech = eine
+// Zeile, je Tag bzw. Woche, aufgeteilt nach "Ergebnis des Gesprächs".
+// Vor dem ersten CRM-Eintrag gibt es keine Zahlen – das steht dann auch da,
+// statt Nullen zu zeigen.
+function mwStrich(von,bis,ortRe){
+  const alle=(D.mw||[]).filter(r=>!ortRe||!r.standort||ortRe.test(r.standort));
+  if(!alle.length)return '<div class="qm-note">Für diesen Standort liegen keine Gesprächsdaten aus MyWellness vor. '
+    +'Der Flow legt sie stündlich unter <b>'+esc(MW_DIR)+'&lt;Standort&gt;/</b> ab.</div>';
+  const start=new Date(Math.min(...alle.map(r=>+r.dt)));start.setHours(0,0,0,0);
+  const heute=clHeute();
+  const stufen=[...new Set(alle.map(r=>r.stufe).filter(x=>x))].sort();
+  const basis=MW.stufe?alle.filter(r=>r.stufe===MW.stufe):alle;
+  // Spalten: alle Antworten, die es an diesem Standort je gab – so bleiben sie ueber die Tage stabil
+  const da=new Set(alle.map(r=>r.erg));
+  const sp=MW_ERG.concat([MW_UNBEKANNT]).filter(e=>da.has(e.k));
   const fD=d=>d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
-  const last=data.days.length?data.days[data.days.length-1].dt:null;
-  const first=data.days.length?data.days[0].dt:null;
-  let h=head('Weekly KPI Tracker · Therapiemanger'+(last?' · letzter Eintrag '+last.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):''));
-  const inP=data.days.filter(d=>d.dt>=von&&d.dt<=bis);
-  const sum=k=>{let n=0,has=false;inP.forEach(d=>{const x=d.v[k];if(x&&x.n!==null){n+=x.n;has=true;}});return has?n:null;};
-  const abCols=data.cols.filter(c=>c.ab);
-  let abS=0,abHas=false;abCols.forEach(c=>{const v=sum(c.k);if(v!==null){abS+=v;abHas=true;}});
-  const fmt=v=>v===null?'—':String(Math.round(v*10)/10).replace('.',',');
-  h+='<div class="cl-tiles">'+data.cols.map(c=>`<div class="cl-tile${c.k==='club'?' hl':''}"><div class="v">${fmt(sum(c.k))}</div><div class="l">${c.l}</div></div>`).join('')
-    +`<div class="cl-tile hl"><div class="v">${abHas?fmt(abS):'—'}</div><div class="l">Abschlüsse gesamt<br>(${abCols.map(c=>c.kz||c.l).join(' + ')})</div></div></div>`;
-  // Werktage ohne jede Eintragung (ab erstem Eintrag, bis heute) – ausweisen statt als 0 zählen
-  const heute=new Date();heute.setHours(0,0,0,0);
-  const have=new Set(data.days.map(d=>d.dt.getTime()));
-  const gaps=[];for(let d=new Date(Math.max(von,first||von));d<=bis&&d<heute;d.setDate(d.getDate()+1)){const wd=d.getDay();if(wd===0||wd===6)continue;if(!have.has(d.getTime()))gaps.push(new Date(d));}
-  // Tagesansicht (Woche) bzw. Wochenverlauf (4 Wochen / Jahr)
-  const kc=data.cols;
-  const cell=x=>!x?'':x.n===null?`<span class="txt">${esc(x.note)}</span>`:fmt(x.n)+(x.note?` <span class="nt" title="${esc(x.note)}">•</span>`:'');
+  const fK=d=>d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  let h='<div class="mw-kopf"><b>✏️ Strichliste</b> <small>aus MyWellness · jeder Fragebogen ein Strich</small></div>';
+  {const st=mwStandText(ortRe);if(st)h+='<div style="margin:-4px 0 8px">'+st+'</div>';}
+  h+='<div class="cl-per" style="margin-bottom:10px">'
+    +[[0,'alle Gespräche']].concat(stufen.map(n=>[n,n+'. Gespräch']))
+      .map(([k,l])=>`<button class="fp${MW.stufe===k?' a':''}" onclick="mwSetStufe(${k})">${esc(l)}</button>`).join('')+'</div>';
+  if(von<start)h+='<div class="qm-note">MyWellness erfasst die Gespräche hier erst seit <b>'+fK(start)
+    +'</b>. Für die Zeit davor gibt es keine CRM-Zahlen; sie werden nicht als 0 gezählt.</div>';
+  if(bis<start)return h;
+  // Zeilen: Tage (bis ein Monat) oder Kalenderwochen, nur ab CRM-Start und nicht in der Zukunft
+  const ab=new Date(Math.max(+von,+start)),bisT=new Date(Math.min(+bis,+heute+864e5-1));
+  const zeilen=[];
   if(clTageweise()){
-    h+='<div class="cl-sub">Tage</div><div class="cl-tw"><table><thead><tr><th>Tag</th>'+kc.map(c=>`<th>${c.l}</th>`).join('')+'</tr></thead><tbody>';
-    for(let d=new Date(von);d<=bis;d.setDate(d.getDate()+1)){const e=inP.find(x=>x.dt.getTime()===d.getTime());
-      h+=`<tr><td>${fD(d)}</td>`+kc.map(c=>`<td>${e?cell(e.v[c.k]):''}</td>`).join('')+'</tr>';}
-    h+='</tbody></table></div>';
+    for(let d=new Date(ab);d<=bisT;d.setDate(d.getDate()+1)){
+      const e=new Date(d);e.setHours(23,59,59,999);
+      const R=basis.filter(r=>r.dt>=d&&r.dt<=e);
+      if((d.getDay()===0||d.getDay()===6)&&!R.length)continue;
+      zeilen.push({l:fD(d),R});
+    }
   }else{
-    const wk={};inP.forEach(d=>{const w=kwOf(d.dt),key=w.jahr*100+w.kw;(wk[key]=wk[key]||{w,ds:[]}).ds.push(d);});
-    const keys=Object.keys(wk).sort((a,b)=>b-a);
-    h+='<div class="cl-sub">Wochenverlauf</div><div class="cl-tw"><table><thead><tr><th>KW</th>'+kc.map(c=>`<th>${c.l}</th>`).join('')+'</tr></thead><tbody>';
-    h+=keys.map(k=>{const{w,ds}=wk[k];return`<tr><td>KW ${w.kw}</td>`+kc.map(c=>{let n=0,has=false;ds.forEach(d=>{const x=d.v[c.k];if(x&&x.n!==null){n+=x.n;has=true;}});return`<td>${has?fmt(n):''}</td>`;}).join('')+'</tr>';}).join('')||`<tr><td colspan="${kc.length+1}" class="txt">Keine Einträge im Zeitraum.</td></tr>`;
-    h+='</tbody></table></div>';
+    for(let m=clMontag(ab);m<=bisT;m.setDate(m.getDate()+7)){
+      const a=new Date(Math.max(+m,+ab)),e=new Date(m);e.setDate(e.getDate()+6);e.setHours(23,59,59,999);
+      const R=basis.filter(r=>r.dt>=a&&r.dt<=e&&r.dt<=bisT);
+      zeilen.push({l:'KW '+kwOf(m).kw,R});
+    }
   }
-  // Anmerkungen aus den Zellen (Freitext neben der Zahl bzw. Urlaub/frei)
-  const notes=[];inP.forEach(d=>kc.forEach(c=>{const x=d.v[c.k];if(x&&x.note&&x.n!==null)notes.push(`<b>${fD(d.dt)}</b> · ${c.l}: ${fmt(x.n)} – ${esc(x.note)}`);}));
-  if(notes.length)h+='<div class="cl-sub">Anmerkungen</div><div class="cl-notes">'+notes.join('<br>')+'</div>';
-  if(gaps.length)h+=`<div class="qm-note" style="margin:14px 0 0">${gaps.length} Werktag${gaps.length>1?'e':''} ohne Eintragung${clTageweise()?': '+gaps.map(fD).join(', '):''} (Feiertage nicht herausgerechnet) – fließen nicht als 0 ein.</div>`;
-  return h+'</div></div>';
+  const zelle=n=>n?String(n):'<span class="txt">·</span>';
+  const zeile=(l,R,cls)=>{const z={};R.forEach(r=>{z[r.erg]=(z[r.erg]||0)+1;});
+    const abg=R.filter(r=>MW_ERG.some(e=>e.k===r.erg&&e.ab)).length;
+    return '<tr'+(cls?' class="'+cls+'"':'')+'><td>'+l+'</td><td><b>'+R.length+'</b></td>'
+      +sp.map(e=>'<td>'+zelle(z[e.k]||0)+'</td>').join('')+'<td><b>'+zelle(abg)+'</b></td></tr>';};
+  h+='<div class="cl-tw cl-strich"><table><thead><tr><th>'+(clTageweise()?'Tag':'Woche')+'</th><th>Gespräche</th>'
+    +sp.map(e=>'<th>'+esc(e.l)+'</th>').join('')+'<th>Abschlüsse</th></tr></thead><tbody>'
+    +zeilen.slice().reverse().map(z=>zeile(z.l,z.R)).join('')
+    +(zeilen.length>1?zeile('Summe',zeilen.reduce((a,z)=>a.concat(z.R),[]),'sum'):'')
+    +'</tbody></table></div>';
+  h+='<div class="re-leise" style="margin-top:8px">Abschlüsse = Club-Mitgliedschaften, Präventionskurse, R+V Fit und T-Rena, jeweils alle Häufigkeiten'
+    +'. Zählt jemand mehrfach (1., 2., 3. Gespräch), steht er je Gespräch einmal da.</div>';
+  return h;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // CLUB-GESPRAECHE AUS MYWELLNESS
@@ -1918,13 +1888,23 @@ const MW_DIR='12_Code/Controlling/MyWellness/';
 // `ab` markiert, was ein verkauftes Angebot ist — welche davon als Abschluss
 // zaehlen, entscheidet die Auswahl in der Ansicht, nicht diese Tabelle.
 const MW_ERG=[
-  {k:'club',    l:'Club-Mitgliedschaft',        ab:true,  re:/club.?mitglied/i},
+  // Häufigkeit steht im Antworttext ("Club Mitgliedschaft 1x / Woche",
+  // "8 - Wochen Präventionskurs  2x/Woche"). Je Häufigkeit ein eigener Eintrag;
+  // fehlt sie im Text, landet die Antwort bei "Häufigkeit nicht angegeben" – geraten wird nicht.
+  // Reihenfolge zaehlt: die genaueren Muster stehen vor dem allgemeinen.
+  {k:'club1',   l:'Club-Mitgliedschaft · einmal pro Woche',  ab:true, re:/(?=.*club.?mitglied)(?=.*(^|\D)1\s*x\s*\/?\s*(pro\s*)?woche)/i},
+  {k:'club2',   l:'Club-Mitgliedschaft · zweimal pro Woche', ab:true, re:/(?=.*club.?mitglied)(?=.*(^|\D)2\s*x\s*\/?\s*(pro\s*)?woche)/i},
+  {k:'club',    l:'Club-Mitgliedschaft · Häufigkeit nicht angegeben', ab:true, re:/club.?mitglied/i},
   // Die Zahl steht mal hinter dem Wort ("Präventionskurs 8x"), mal davor
   // ("16 - Wochen Präventionskurs 1x/Woche", "8x Präventionskurs …"). Gesucht
   // wird deshalb nur, ob 8 oder 16 irgendwo frei dasteht — die "1x/Woche"
   // dahinter darf nicht mitzaehlen.
-  {k:'praev8',  l:'Präventionskurs 8 Wochen',   ab:true,  re:/(?=.*pr[aä]vention)(?=.*(^|\D)8(\D|$))/i},
-  {k:'praev16', l:'Präventionskurs 16 Wochen',  ab:true,  re:/(?=.*pr[aä]vention)(?=.*(^|\D)16(\D|$))/i},
+  {k:'praev8_1', l:'Präventionskurs 8 Wochen · einmal pro Woche',  ab:true, re:/(?=.*pr[aä]vention)(?=.*(^|\D)8(\D|$))(?=.*(^|\D)1\s*x\s*\/?\s*(pro\s*)?woche)/i},
+  {k:'praev8_2', l:'Präventionskurs 8 Wochen · zweimal pro Woche', ab:true, re:/(?=.*pr[aä]vention)(?=.*(^|\D)8(\D|$))(?=.*(^|\D)2\s*x\s*\/?\s*(pro\s*)?woche)/i},
+  {k:'praev8',   l:'Präventionskurs 8 Wochen · Häufigkeit nicht angegeben', ab:true, re:/(?=.*pr[aä]vention)(?=.*(^|\D)8(\D|$))/i},
+  {k:'praev16_1',l:'Präventionskurs 16 Wochen · einmal pro Woche',  ab:true, re:/(?=.*pr[aä]vention)(?=.*(^|\D)16(\D|$))(?=.*(^|\D)1\s*x\s*\/?\s*(pro\s*)?woche)/i},
+  {k:'praev16_2',l:'Präventionskurs 16 Wochen · zweimal pro Woche', ab:true, re:/(?=.*pr[aä]vention)(?=.*(^|\D)16(\D|$))(?=.*(^|\D)2\s*x\s*\/?\s*(pro\s*)?woche)/i},
+  {k:'praev16',  l:'Präventionskurs 16 Wochen · Häufigkeit nicht angegeben', ab:true, re:/(?=.*pr[aä]vention)(?=.*(^|\D)16(\D|$))/i},
   {k:'rv',      l:'R+V Fit',                    ab:true,  re:/r\s*\+\s*v/i},
   {k:'trena',   l:'T-Rena',                     ab:true,  re:/t-?rena/i},
   {k:'folgeg',  l:'Folgegespräch',              ab:false, re:/folgegespr/i},
@@ -2020,9 +2000,11 @@ const MW_ART={
   haengt   :{l:'Hängt fest',                    f:'#c03b35'},
   unklar   :{l:'Unklar',                        f:'#95a1ad'}
 };
+// Club- und Kursvarianten (club1, club2, praev8_1 …) zaehlen wie ihre Grundart
+function mwIstClub(erg){return /^club/.test(String(erg||''));}
 function mwArt(erg){
-  if(erg==='club')return'ziel';
-  if(erg==='praev8'||erg==='praev16'||erg==='rv'||erg==='trena')return'unterwegs';
+  if(mwIstClub(erg))return'ziel';
+  if(/^praev/.test(String(erg||''))||erg==='rv'||erg==='trena')return'unterwegs';
   if(erg==='kein'||erg==='ungeeig')return'beendet';
   // Folgerezept: Der Patient ist wieder in Therapie, das naechste Gespraech
   // kommt am Ende des neuen Rezepts — er steht dann wieder auf der Liste.
@@ -2069,7 +2051,7 @@ function mwReisen(saetze,jetzt){
     // beste erreichte Stand, nicht nur der letzte.
     // Wer einmal im Club ist, bleibt am Ziel — auch wenn danach noch ein
     // Gespraech gefuehrt wurde.
-    x.club=x.schritte.some(r=>r.erg==='club');
+    x.club=x.schritte.some(r=>mwIstClub(r.erg));
     if(x.club)x.art='ziel';
     x.offen=MW_OFFEN.indexOf(x.art)>=0;
     // Welche Stationen die Person unterwegs genommen hat.

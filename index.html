@@ -1169,26 +1169,29 @@ function clOrt(k,titel,von,bis){
 // CLUB-MITGLIEDER (Gruppen im MyWellness-CRM)
 // ═══════════════════════════════════════════════════════════════════════════
 // Wer Club-Mitglied ist oder im Praeventionskurs steckt, steht im CRM als
-// Gruppe (Personen → Kontakte → Filter Gruppe). Der Flow legt je Club und
-// Gruppe stuendlich eine Datei ab:
-//   MyWellness/<Club>/Gruppen/<Gruppen-Id>.json                 aktueller Stand
-//   MyWellness/<Club>/Gruppen/Verlauf/<yyyy-MM>/<dd> <Id>.json   letzter Stand des Tages
-// Inhalt: {id,name,anzahl,stand,mitglieder:[{id,name}]}. Nur selbst angelegte
-// Gruppen — die automatischen ("Mit Programm", "Aktive Kunden" …) nicht.
-// Die Clubs benennen ihre Gruppen verschieden (Werneck "KIMOJO Club Starter
-// (1x pro Woche)", Kitzingen "Monatlich Kündbar Starter"), deshalb wird nach
-// Mustern sortiert.
+// Gruppe (Personen → Kontakte → Filter Gruppe). Der Flow legt je Club
+// (Ordner Werneck oder Kitzingen) stuendlich eine Datei ab:
+//   MyWellness/<Club>/Gruppen/<Gruppen-Id>.json                  aktueller Stand
+//   MyWellness/<Club>/Gruppen/Verlauf/<yyyy-MM>/<dd> <Id>.json    letzter Stand des Tages
+// Inhalt: {id:<Zahl>, name, anzahl:<Zahl>, stand:<ISO-UTC>,
+//          mitglieder:[{id:<String>, name}]}. Nur selbst angelegte Gruppen.
+// Club ist nur, wessen Name "Smart" oder "Starter" enthaelt — und nur, wenn
+// es kein Praeventionskurs ist. Mitgliedschaft, Fitnessclub, Kündbar ohne
+// diese Worte und alles andere zaehlen nicht mit.
 const MG_VERLAUF_AB='2026-10-28';
 const MG_ART=[
-  {k:'club',   l:'Club-Mitglieder',   re:/club|smart|starter|mitgliedschaft|k[uü]ndbar/i},
+  {k:'club',   l:'Club-Mitglieder',   re:/smart|starter/i},
   {k:'praev',  l:'Präventionskurse',  re:/pr[aä]vention/i},
   {k:'weitere',l:'Weitere Gruppen',   re:/./}
 ];
-// Praevention zuerst pruefen: "Präventionskurs … 1x" ist kein Club.
+// Praevention zuerst, nicht ueber die Reihenfolge in MG_ART: ein
+// Praeventionskurs bleibt ein Kurs, auch wenn der Name "Smart" oder "Starter"
+// enthaelt.
 function mgArt(name){
   const s=String(name||'');
-  if(MG_ART[1].re.test(s))return 'praev';
-  if(MG_ART[0].re.test(s))return 'club';
+  const re=k=>{const a=MG_ART.find(x=>x.k===k);return a?a.re:/(?!)/;};
+  if(re('praev').test(s))return 'praev';
+  if(re('club').test(s))return 'club';
   return 'weitere';
 }
 // Starter = 1x pro Woche, Smart = 2x pro Woche — so steht es in Werneck im
@@ -1199,23 +1202,37 @@ function mgFreq(name){
   if(/(^|\D)1\s*x|starter/i.test(s))return 1;
   return 0;
 }
-// Je Art: Gruppen mit Mitgliedern, dazu die Zahl der Koepfe. Wer in zwei
-// Gruppen derselben Art steht, zaehlt einmal.
+// Je Art: Gruppen mit Mitgliedern, dazu die Zahl der Koepfe. Dieselbe
+// Mitglieder-Id (String, nicht der Name) zaehlt einmal, auch in mehreren
+// Gruppen. Die 1×/2×-Zahlen sind die Summen von anzahl je Gruppe
+// (Smart = 2, Starter = 1): wer in beiden steht, steckt in beiden Summen.
 function mgZusammen(gruppen){
   const A={};
-  MG_ART.forEach(a=>{A[a.k]={k:a.k,l:a.l,gruppen:[],koepfe:0,freq:{1:0,2:0}};});
+  MG_ART.forEach(a=>{A[a.k]={k:a.k,l:a.l,gruppen:[],koepfe:0,freq:{1:0,2:0},ohneId:0};});
   (gruppen||[]).forEach(g=>{if(g&&(+g.anzahl||0)>0)A[mgArt(g.name)].gruppen.push(g);});
   Object.values(A).forEach(a=>{
     a.gruppen.sort((x,y)=>String(x.name).localeCompare(String(y.name),'de'));
-    const ids=new Set();let ohneListe=0;
+    const ids=new Set();let ohneListe=0,ohneId=0;
     a.gruppen.forEach(g=>{
-      if(Array.isArray(g.mitglieder)&&g.mitglieder.length)g.mitglieder.forEach(m=>ids.add(m.id||m.name));
+      if(Array.isArray(g.mitglieder)&&g.mitglieder.length)g.mitglieder.forEach(m=>{
+        const id=mgMitglId(m);
+        if(id)ids.add(id);else ohneId++;
+      });
       else ohneListe+=+g.anzahl||0;
       const f=mgFreq(g.name);if(f)a.freq[f]+=+g.anzahl||0;
     });
-    a.koepfe=ids.size+ohneListe;
+    a.koepfe=ids.size+ohneListe+ohneId;
+    a.ohneId=ohneId;
+    a.ohneListe=ohneListe;
   });
   return A;
+}
+// Mitglieder-Id bleibt ein String. Leer oder fehlend: nicht ueber den Namen
+// zusammenfuehren (das waere geraten).
+function mgMitglId(m){
+  if(!m||m.id==null)return '';
+  const s=String(m.id);
+  return s===''?'':s;
 }
 // Veraenderung je Gruppe zwischen zwei Staenden: wer neu dabei ist, wer fehlt.
 function mgVergleich(alt,neu){
@@ -1223,16 +1240,20 @@ function mgVergleich(alt,neu){
   return (neu||[]).map(g=>{
     const a=byId[g.id];
     if(!a)return {id:g.id,delta:null,neu:[],raus:[]};
-    const ka=new Set((a.mitglieder||[]).map(m=>m.id)),kn=new Set((g.mitglieder||[]).map(m=>m.id));
+    const ka=new Set((a.mitglieder||[]).map(mgMitglId).filter(Boolean)),kn=new Set((g.mitglieder||[]).map(mgMitglId).filter(Boolean));
     return {id:g.id,delta:(+g.anzahl||0)-(+a.anzahl||0),
-      neu:(g.mitglieder||[]).filter(m=>!ka.has(m.id)).map(m=>m.name),
-      raus:(a.mitglieder||[]).filter(m=>!kn.has(m.id)).map(m=>m.name)};
+      neu:(g.mitglieder||[]).filter(m=>mgMitglId(m)&&!ka.has(mgMitglId(m))).map(m=>m.name),
+      raus:(a.mitglieder||[]).filter(m=>mgMitglId(m)&&!kn.has(mgMitglId(m))).map(m=>m.name)};
   });
 }
 function mgParse(t){
-  try{const o=JSON.parse(String(t||'').replace(/^﻿/,''));
-    return o&&o.id!=null?{id:o.id,name:String(o.name||''),anzahl:+o.anzahl||0,stand:o.stand||'',
-      mitglieder:Array.isArray(o.mitglieder)?o.mitglieder:[]}:null;}catch(e){return null;}
+  try{const o=JSON.parse(String(t||'').replace(/^\uFEFF/,''));
+    // id der Gruppe ist eine Zahl, die der Mitglieder ein String. Beides so
+    // lassen: eine lange Mitglieder-Id darf nicht zur Zahl werden.
+    if(!o||o.id==null||Array.isArray(o))return null;
+    return {id:o.id,name:String(o.name||''),anzahl:+o.anzahl||0,stand:o.stand||'',
+      mitglieder:Array.isArray(o.mitglieder)?o.mitglieder.filter(m=>m&&typeof m==='object').map(m=>({id:m.id==null?'':String(m.id),name:m.name==null?'':String(m.name)})):[]};
+  }catch(e){return null;}
 }
 // Aktueller Stand je Club (beim Laden gefuellt) und Tagesstaende (bei Bedarf
 // nachgeladen, dann wird neu gezeichnet).
@@ -1269,12 +1290,16 @@ function mgLeiste(ortRe){
   const A=mgZusammen(MG.orte[ort].gruppen);
   const zeile=g=>esc(g.name)+': <b>'+g.anzahl+'</b>';
   const kachel=a=>!a.gruppen.length?'':'<div class="re-k" style="flex:1 1 220px"><b>'+a.koepfe+'</b><span>'+esc(a.l)
-    +((a.freq[1]||a.freq[2])?' · 1×/Woche '+a.freq[1]+' · 2×/Woche '+a.freq[2]:'')+'</span>'
+    +((a.freq[1]||a.freq[2])?' · 1×/Woche '+a.freq[1]+' · 2×/Woche '+a.freq[2]:'')
+    +(a.ohneId?' · '+a.ohneId+' ohne Mitglieder-Id, nicht zusammengeführt':'')
+    +(a.ohneListe?' · '+a.ohneListe+' ohne Mitgliederliste':'')+'</span>'
     +'<div class="re-leise" style="margin-top:4px;line-height:1.5">'+a.gruppen.map(zeile).join('<br>')+'</div></div>';
   const st=MG.orte[ort].stand;
+  const standTxt=st?'CRM-Stand: '+st.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})
+      +' '+st.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · ':'';
   return '<div class="re-kacheln">'+kachel(A.club)+kachel(A.praev)+kachel(A.weitere)+'</div>'
-    +(st?'<div class="re-leise" style="margin:-8px 0 14px">CRM-Stand: '+st.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})
-      +' '+st.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Personen in mehreren Gruppen zählen einmal</div>':'');
+    +'<div class="re-leise" style="margin:-8px 0 14px">'+standTxt
+    +'Als Club zählen nur Gruppen mit Smart oder Starter. Prävention bleibt Prävention. Personen in mehreren Gruppen zählen einmal.</div>';
 }
 // Die Ansicht "Mitglieder": Stand am Ende des gewaehlten Zeitraums gegen den
 // Tag davor — wer kam dazu, wer ist raus.
@@ -1297,7 +1322,9 @@ function mgAnsicht(ortRe,von,bis){
   const A=mgZusammen(ende.gruppen);
   MG_ART.forEach(art=>{
     const a=A[art.k];if(!a.gruppen.length)return;
-    h+='<div class="re-kopf">'+esc(a.l)+' <small>'+a.koepfe+' Personen</small></div><table class="re-tab"><tr><th>Gruppe</th><th class="n">Anzahl</th>'
+    h+='<div class="re-kopf">'+esc(a.l)+' <small>'+a.koepfe+' Personen'
+      +(a.ohneId?' · '+a.ohneId+' ohne Mitglieder-Id, nicht zusammengeführt':'')
+      +(a.ohneListe?' · '+a.ohneListe+' ohne Mitgliederliste':'')+'</small></div><table class="re-tab"><tr><th>Gruppe</th><th class="n">Anzahl</th>'
       +(vgl?'<th class="n">Veränderung</th><th>neu dabei / nicht mehr dabei</th>':'')+'</tr>';
     a.gruppen.forEach(g=>{
       const v=V[g.id];

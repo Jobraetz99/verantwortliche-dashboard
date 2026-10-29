@@ -561,6 +561,75 @@ tbody tr:hover{background:var(--sunken)}
 <div class="ft">BM Group · Verantwortliche Dashboard · 2026</div>
 </div></div>
 <script>
+// Kalender und Uhrzeiten sind Europe/Berlin, unabhaengig von der Zeitzone
+// des Browsers. Intl reicht; es kommt keine Bibliothek dazu.
+const TZB='Europe/Berlin';
+['toLocaleString','toLocaleDateString','toLocaleTimeString'].forEach(function(m){
+  const orig=Date.prototype[m];
+  Date.prototype[m]=function(loc,opt){
+    return orig.call(this,loc,Object.assign({},opt||{},{timeZone:TZB}));
+  };
+});
+function tzParts(d){
+  const dt=d instanceof Date?d:new Date(d);
+  if(isNaN(+dt))return null;
+  const fmt=new Intl.DateTimeFormat('en-US',{timeZone:TZB,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',weekday:'short'});
+  const o={};
+  for(const p of fmt.formatToParts(dt)) if(p.type!=='literal') o[p.type]=p.value;
+  let h=o.hour; if(h==='24') h='00';
+  return {y:+o.year,m:+o.month,d:+o.day,h:+h,mi:+o.minute,s:+o.second,
+    wd:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[o.weekday]};
+}
+function tzOffsetMs(utcMs){
+  const p=tzParts(new Date(utcMs));
+  const sec=Math.floor(utcMs/1000)*1000;
+  return Date.UTC(p.y,p.m-1,p.d,p.h,p.mi,p.s)-sec;
+}
+// Wanduhr in Berlin → Zeitpunkt. Ueberlappung am 25.10. (02:00–03:00 zweimal):
+// die fruehere, noch sommerliche Lesart. Luecke am 29.03. (02:00–03:00 gibt es
+// nicht): wie ein Browser in Berlin, die Uhr springt auf 03:xx vor.
+function tzWall(y,m0,d,h,mi,s,ms){
+  h=h||0;mi=mi||0;s=s||0;ms=ms||0;
+  const utc=Date.UTC(y,m0,d,h,mi,s);
+  const t1=utc-tzOffsetMs(utc),t2=utc-tzOffsetMs(t1);
+  const hit=t=>{const p=tzParts(new Date(t));return p&&p.y===y&&p.m===m0+1&&p.d===d&&p.h===h&&p.mi===mi&&p.s===s;};
+  const hits=[t1,t2,t1-36e5,t1+36e5,t2-36e5,t2+36e5].filter(hit);
+  return new Date((hits.length?Math.min.apply(null,hits):t2)+ms);
+}
+function bStart(d){const p=tzParts(d);return tzWall(p.y,p.m-1,p.d);}
+function bEndOf(d){const p=tzParts(d);return tzWall(p.y,p.m-1,p.d,23,59,59,999);}
+function bAddDays(d,n){
+  const p=tzParts(d),u=new Date(Date.UTC(p.y,p.m-1,p.d+n));
+  return tzWall(u.getUTCFullYear(),u.getUTCMonth(),u.getUTCDate(),p.h,p.mi,p.s,d.getMilliseconds());
+}
+function bAddMonths(d,n){
+  const p=tzParts(d),u=new Date(Date.UTC(p.y,p.m-1+n,1));
+  const dim=new Date(Date.UTC(u.getUTCFullYear(),u.getUTCMonth()+1,0)).getUTCDate();
+  return tzWall(u.getUTCFullYear(),u.getUTCMonth(),Math.min(p.d,dim),p.h,p.mi,p.s);
+}
+function bWD(d){return tzParts(d).wd;}
+function bYMD(d){const p=tzParts(d);return p.y+'-'+String(p.m).padStart(2,'0')+'-'+String(p.d).padStart(2,'0');}
+function bHM(d){const p=tzParts(d);return String(p.h).padStart(2,'0')+':'+String(p.mi).padStart(2,'0');}
+function bYM(y,m0){const u=new Date(Date.UTC(y,m0,1));return u.getUTCFullYear()+'-'+String(u.getUTCMonth()+1).padStart(2,'0');}
+function bJahr(d){return tzParts(d).y;}
+function bMonat(d){return tzParts(d).m;}
+// Naive Angaben (CSV, Praxis, Kennzahlen) sind Berliner Ortszeit. Ein
+// angehaengtes Z oder ±Offset bleibt ein absoluter Zeitpunkt.
+function parseZeit(v){
+  if(v instanceof Date)return isNaN(v)?null:v;
+  if(typeof v==='number'&&v>1e11)return new Date(v);
+  if(typeof v==='number'&&v>40000){
+    const u=new Date(Math.round((v-25569)*86400000));
+    return tzWall(u.getUTCFullYear(),u.getUTCMonth(),u.getUTCDate(),u.getUTCHours(),u.getUTCMinutes(),u.getUTCSeconds());
+  }
+  const s=String(v==null?'':v).trim(); if(!s)return null;
+  if(/^\d{4}-\d{2}-\d{2}T/.test(s)&&/(?:Z|[+-]\d{2}:?\d{2})$/.test(s)){const d=new Date(s);return isNaN(d)?null:d;}
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?$/);
+  if(m)return tzWall(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+  m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if(m){const j=+m[3]<100?2000+ +m[3]:+m[3];return tzWall(j,+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0));}
+  const d=new Date(s);return isNaN(d)?null:d;
+}
 const MC={auth:{clientId:"9fe9cda7-79c3-4d06-82dc-372715bb8086",authority:"https://login.microsoftonline.com/3e5c8d47-8ccc-42f6-877d-0d0e72972e39",redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}};
 const LR={scopes:["Files.Read","Files.ReadWrite","Sites.Read.All"]};const ml=new msal.PublicClientApplication(MC);
 const SI={k:{h:'kimojophysiotherapie.sharepoint.com',p:'/sites/KIMOJOManagement'},p:{h:'kimojophysiotherapie.sharepoint.com',p:'/sites/PfFiP-TeamPortal'},pm:{h:'kimojophysiotherapie.sharepoint.com',p:'/sites/KIMOJOPraxismanagement'}};
@@ -586,19 +655,19 @@ const gq=u=>fetch(u,{headers:{Authorization:'Bearer '+window._tk}}).then(r=>r.ok
 async function gS(d,f,n){const r=await gq(`https://graph.microsoft.com/v1.0/drives/${d}/items/${f}/workbook/worksheets('${encodeURIComponent(n)}')/usedRange`);return r?r.values:null;}
 async function gSN(d,f){const r=await gq(`https://graph.microsoft.com/v1.0/drives/${d}/items/${f}/workbook/worksheets`);return r?r.value.map(s=>s.name):[];}
 async function rDr(k){const s=SI[k];const site=await gq(`https://graph.microsoft.com/v1.0/sites/${s.h}:${s.p}`);if(!site)return null;const d=await gq(`https://graph.microsoft.com/v1.0/sites/${site.id}/drive`);return d?d.id:null;}
-function cKW(){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+3-(d.getDay()+6)%7);const w=new Date(d.getFullYear(),0,4);return 1+Math.round(((d.getTime()-w.getTime())/864e5-3+(w.getDay()+6)%7)/7);}
+function cKW(){return kwOf(new Date()).kw;}
 
 // PARSERS
 function pAusl(data){const kR=data[2]||[],mR=data[1]||[],pS=data[19]||[];let eS=null;for(let i=21;i<Math.min(data.length,35);i++){if(data[i]&&data[i][0]&&String(data[i][0]).includes('Summe')){eS=data[i];break;}}const kws=[];let c=5,lP=null;while(c<kR.length){const kw=kR[c];if(kw&&typeof kw==='number'&&kw>0&&kw<53){const ac=c+2,pv=pS[ac],ev=eS?eS[ac]:null,mo=String(mR[c]||'');if(pv&&typeof pv==='number'&&pv>0&&pv<=1.5){const pp=Math.round(pv*1000)/10;if(lP!==null&&Math.abs(pp-lP)<0.01)break;lP=pp;kws.push({kw:Math.round(kw),physio:pp,ergo:(ev&&typeof ev==='number'&&ev>0&&ev<=1.5)?Math.round(ev*1000)/10:null,month:mo});}c+=4;}else c++;}return kws;}
 function pKPI(data){const res={};if(!data||data.length<5)return res;let hi=-1;for(let i=0;i<Math.min(6,data.length);i++){if(String(data[i][0]||'').trim()==='Monat'){hi=i;break;}}if(hi<0)return res;for(let i=hi+1;i<Math.min(hi+13,data.length);i++){const m=String(data[i][0]||'').trim();if(!m||m==='Ø Jahr')continue;const ts=[];for(let c=1;c<data[i].length-2;c+=2){const b=parseFloat(data[i][c])||0;const d=parseFloat(data[i][c+1])||0;ts.push({b,d});}const bs=ts.map(t=>t.b).filter(v=>v>0),ds=ts.map(t=>t.d).filter(v=>v>0);if(bs.length||ds.length)res[m]={befund:bs.length?bs.reduce((a,b)=>a+b,0)/bs.length:0,doku:ds.length?ds.reduce((a,b)=>a+b,0)/ds.length:0};}return res;}
-function pFB(data){if(!data||data.length<2)return[];return data.slice(1).map(r=>{const s=r[1],t=r[5]||'',st=parseFloat(r[6])||0,n=r[7]||'';let d=null;if(typeof s==='number'&&s>40000)d=new Date((s-25569)*864e5);else if(s)try{d=new Date(s);}catch(e){}return{date:d,text:String(t),stars:st,name:String(n)};}).filter(f=>f.date&&!isNaN(f.date));}
+function pFB(data){if(!data||data.length<2)return[];return data.slice(1).map(r=>{const s=r[1],t=r[5]||'',st=parseFloat(r[6])||0,n=r[7]||'';const d=parseZeit(s);return{date:d,text:String(t),stars:st,name:String(n)};}).filter(f=>f.date&&!isNaN(f.date));}
 function pRaw(rows){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i],nm=r[0],pr=parseFloat(r[7])||0;if(!nm||pr<=0)continue;let mo=null;const dv=r[1];if(typeof dv==='number'&&dv>40000){mo=new Date(Math.round((dv-25569)*864e5)).getUTCMonth()+1;}else{const s=String(dv),m=s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);if(m)mo=parseInt(m[2]);else{const m2=s.match(/(\d{4})-(\d{2})-(\d{2})/);if(m2)mo=parseInt(m2[2]);}}d.push({name:String(nm).replace(/\s*\((?:Physio|Ergo)\s*(?:-\s*)?#\d+\)\s*/g,'').replace(/\s+/g,' ').trim(),mo,pr});}return d;}
-function pMedFull(rows,standort){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i];if(!r||!r[0])continue;const pat=r[4]||'';const abr=String(r[8]||'').toUpperCase();let dt=null;const dv=r[1];if(typeof dv==='number'&&dv>40000)dt=new Date((dv-25569)*864e5);else{const s=String(dv||''),m=s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);if(m)dt=new Date(parseInt(m[3]<100?2000+parseInt(m[3]):m[3]),parseInt(m[2])-1,parseInt(m[1]));}if(!pat||!dt)continue;d.push({pat,dt,open:abr!=='WAHR'&&abr!=='TRUE'&&abr!=='1',standort});}return d;}
+function pMedFull(rows,standort){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i];if(!r||!r[0])continue;const pat=r[4]||'';const abr=String(r[8]||'').toUpperCase();const dt=parseZeit(r[1]);if(!pat||!dt||isNaN(dt))continue;d.push({pat,dt,open:abr!=='WAHR'&&abr!=='TRUE'&&abr!=='1',standort});}return d;}
 // QM: Termine inkl. Rezeptnummer aus dem Praxissoftware-Export (gleiche Dateien, mehr Spalten)
-function pQMT(rows,standort){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i];if(!r||!r[0])continue;const pat=String(r[4]||'').trim(),pos=String(r[5]||'').trim(),lst=String(r[6]||'').trim();let dt=null;const dv=r[1];if(typeof dv==='number'&&dv>40000)dt=new Date(Math.round((dv-25569)*864e5));else{const s=String(dv||''),m=s.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);if(m)dt=new Date(parseInt(m[3])<100?2000+parseInt(m[3]):parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));}if(!pat||!dt||isNaN(dt))continue;if(/ausfall/i.test(lst))continue;const th=String(r[0]).replace(/\s*\((?:Physio|Ergo)\s*(?:-\s*)?#\d+\)\s*/g,'').replace(/\s+/g,' ').trim();d.push({th,dt,uz:String(r[2]||''),pat,pos,lst,standort});}return d;}
+function pQMT(rows,standort){const d=[];for(let i=1;i<rows.length;i++){const r=rows[i];if(!r||!r[0])continue;const pat=String(r[4]||'').trim(),pos=String(r[5]||'').trim(),lst=String(r[6]||'').trim();const dt=parseZeit(r[1]);if(!pat||!dt||isNaN(dt))continue;if(/ausfall/i.test(lst))continue;const th=String(r[0]).replace(/\s*\((?:Physio|Ergo)\s*(?:-\s*)?#\d+\)\s*/g,'').replace(/\s+/g,' ').trim();d.push({th,dt,uz:String(r[2]||''),pat,pos,lst,standort});}return d;}
 // --- QM v3: Helper ---
-function qmDayKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function qmHM(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function qmDayKey(d){return bYMD(d);}
+function qmHM(d){return bHM(d);}
 function cleanTh(s){return String(s||'').replace(/\s*\(.*?\)\s*/g,' ').replace(/\s+/g,' ').trim();}
 const HIST_ABGESAGT=/ABGESAGT|ABSAGE|STORN|AUSGEFALLEN|ENTFALLEN|NICHT.?ERSCHIENEN|GEL[OÖ]SCHT|CANCEL/i;
 /* Der Historien-Export liefert den Mitarbeiter seit 01.10.2026 direkt mit
@@ -624,7 +693,7 @@ function pWerneckQMT(tp,hist,vo,label){
     if(!t||!t.Beginn)return;
     if(!(t.PatientId||t.Art===1||t.Art===4))return;
     if(t.Status===8)return;
-    const x=new Date(t.Beginn);if(isNaN(x.getTime()))return;
+    const x=parseZeit(t.Beginn);if(!x||isNaN(x.getTime()))return;
     const dk=qmDayKey(x),vid=t.VerordnungId||null;
     const m=(t.Mitarbeiter&&t.Mitarbeiter[0])||null;
     const th=m?cleanTh((m.Nachname||'')+', '+(m.Vorname||'')):'—';
@@ -632,7 +701,7 @@ function pWerneckQMT(tp,hist,vo,label){
     const key=(t.PatientId||'?')+'|'+dk+'|'+qmHM(x);
     if(seen.has(key))return;seen.add(key);
     const pat=(((t.PatientNachname||'')+', '+(t.PatientVorname||'')).replace(/^,\s*|,\s*$/g,'').trim())||(vid&&voMap[vid]&&voMap[vid].pat)||pidMap[t.PatientId]||('Patient #'+(t.PatientId||'?'));
-    recs.push({th,dt:new Date(x.getFullYear(),x.getMonth(),x.getDate()),uz:qmHM(x),pat,
+    recs.push({th,dt:bStart(x),uz:qmHM(x),pat,
       pos:vid?('W'+vid):('W?'+key),lst:String(t.Bezeichnung||t.Heilmittel||(vid&&voMap[vid]&&voMap[vid].hm)||''),
       standort:label,region:'Werneck',erst:false,vid,pid:t.PatientId||null});
   });
@@ -640,7 +709,7 @@ function pWerneckQMT(tp,hist,vo,label){
     if(!n||n.__typename&&n.__typename!=='PatientenTermin')return;
     if(!n.from)return;
     if(n.status&&HIST_ABGESAGT.test(String(n.status)))return;
-    const x=new Date(n.from);if(isNaN(x.getTime()))return;
+    const x=parseZeit(n.from);if(!x||isNaN(x.getTime()))return;
     const dk=qmDayKey(x);
     const key=(n.patientId||'?')+'|'+dk+'|'+qmHM(x);
     if(seen.has(key))return;seen.add(key);
@@ -652,7 +721,7 @@ function pWerneckQMT(tp,hist,vo,label){
     noteMin(vid,dk);
     const th=p?cleanTh((p.nachname||'')+', '+(p.vorname||'')):'—';
     const pat=(vid&&voMap[vid]&&voMap[vid].pat)||pidMap[n.patientId]||('Patient #'+(n.patientId||'?'));
-    recs.push({th,dt:new Date(x.getFullYear(),x.getMonth(),x.getDate()),uz:qmHM(x),pat,
+    recs.push({th,dt:bStart(x),uz:qmHM(x),pat,
       pos:vid?('W'+vid):('W?'+key),lst:(vid&&voMap[vid]&&voMap[vid].hm)||'',
       standort:label,region:'Werneck',erst:false,vid,pid:n.patientId||null});
   });
@@ -675,11 +744,11 @@ function pKitzF4(woche){
       if(!t.PatientId)return;
       if(t.Status===8)return;
       if(!t.Beginn)return;
-      const x=new Date(t.Beginn);if(isNaN(x.getTime()))return;
+      const x=parseZeit(t.Beginn);if(!x||isNaN(x.getTime()))return;
       const m=(t.Mitarbeiter&&t.Mitarbeiter[0])||null;
       const th=m?cleanTh((m.Nachname||'')+', '+(m.Vorname||'')):'—';
       const pat=(((t.PatientNachname||'')+', '+(t.PatientVorname||'')).replace(/^,\s*|,\s*$/g,'').trim())||('Patient #'+t.PatientId);
-      recs.push({th,dt:new Date(x.getFullYear(),x.getMonth(),x.getDate()),uz:qmHM(x),pat,
+      recs.push({th,dt:bStart(x),uz:qmHM(x),pat,
         pos:t.VerordnungId?('F4-'+t.VerordnungId):('F4?'+t.Id),lst:String(t.Bezeichnung||t.Heilmittel||''),
         standort:'Kitzingen',region:'Kitzingen',erst:t.Position===1});
     });
@@ -705,7 +774,7 @@ function pNPS(rows){
   return rows.slice(1).map(r=>{
     if(!r)return null;
     const n=parseFloat(r[npsCol]);if(isNaN(n))return null;
-    let dt=null;if(dCol>=0){const dv=r[dCol];if(typeof dv==='number'&&dv>40000)dt=new Date((dv-25569)*864e5);else if(dv){try{dt=new Date(dv);}catch(e){}}}
+    const dt=dCol>=0?parseZeit(r[dCol]):null;
     return{nps:n,bereich:String(r[bCol]||'').toLowerCase(),date:dt};
   }).filter(Boolean);
 }
@@ -770,8 +839,9 @@ async function loadAll(){
     const WBASE='12_Code/Patientenchecker/Dateien Export/',CBASE='12_Code/Controlling/';
     // Medifox-Rechnungen (Flow „Medifox Rechnungen“), eine Datei je Monat des
     // laufenden Jahres — für die Ausfallrechnungen Kitzingen.
-    const mfReP=Promise.all(Array.from({length:new Date().getMonth()+1},(_,i)=>
-      jGet(CBASE+'Medifox Rechnungen/medifox-rechnungen-'+new Date().getFullYear()+'-'+String(i+1).padStart(2,'0')+'.json')));
+    const jetztP=tzParts(new Date());
+    const mfReP=Promise.all(Array.from({length:jetztP.m},(_,i)=>
+      jGet(CBASE+'Medifox Rechnungen/medifox-rechnungen-'+jetztP.y+'-'+String(i+1).padStart(2,'0')+'.json')));
     const W_DAYS=['heute','morgen','t2','t3','t4','t5','t6','t7','t8','t9','t10','t11','t12','t13'];
     // Mitarbeiter kommt aus dem Flow normalerweise als Liste, zeitweise als
     // Text ("[{\"Id\":…}]"). Hier einheitlich zur Liste machen.
@@ -837,9 +907,8 @@ async function loadAll(){
     // Kennzahlendateien (eine je Monat) und werden erst seit Oktober 2026
     // mitgeschrieben — aeltere Monate gibt es nicht.
     const kennP=(async()=>{
-      const jetzt=new Date(),ms=[];
-      for(let i=0;i<6;i++){const d=new Date(jetzt.getFullYear(),jetzt.getMonth()-i,1);
-        const m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(m<'2026-10')break;ms.push(m);}
+      const jetztP=tzParts(new Date()),ms=[];
+      for(let i=0;i<6;i++){const m=bYM(jetztP.y,jetztP.m-1-i);if(m<'2026-10')break;ms.push(m);}
       // Neben jeder Monatsdatei liegt eine Sicherung. Alte Patientenchecker-
       // Fenster kuerzen die Monatsdatei gelegentlich auf einen Tag; die
       // Sicherung fassen sie nicht an. Gelesen werden beide, je Tag gewinnt
@@ -925,7 +994,7 @@ async function loadAll(){
 const Q_MAP={Q1:['Jan','Feb','Mär'],Q2:['Apr','Mai','Jun'],Q3:['Jul','Aug','Sep'],Q4:['Okt','Nov','Dez']};
 function getMs(){
   const avail=new Set(D.raw.map(r=>r.mo).filter(Boolean).map(m=>MN[m-1]));
-  if(aM==='YTD'){const cur=new Date().getMonth();return MN.filter((m,i)=>avail.has(m)&&i<cur);}
+  if(aM==='YTD'){const cur=tzParts(new Date()).m-1;return MN.filter((m,i)=>avail.has(m)&&i<cur);}
   if(Q_MAP[aM])return Q_MAP[aM].filter(m=>avail.has(m));
   return[aM];
 }
@@ -942,7 +1011,7 @@ function getMonthFromSheet(n){const nl=n.toLowerCase();const map={januar:'Jan',f
 function getKSStats(){
   const out={maCount:0,projVollzeit:0,target:15,overTarget:0,available:false};
   if(!D.ks||!D.ks.byMA||!D.ks.byMA.length)return out;
-  const completed=new Date().getMonth(); // verstrichene volle Monate (0-basiert)
+  const completed=tzParts(new Date()).m-1; // verstrichene volle Monate (0-basiert)
   if(completed<=0)return out;
   // Tage/Woche fuzzy-Lookup
   const getTW=name=>{
@@ -1002,7 +1071,7 @@ function getNPS(){
   // Monatsfilter (falls Datum vorhanden)
   const mn=getMNums();
   const withDate=arr.filter(x=>x.date);
-  if(withDate.length>0)arr=arr.filter(x=>!x.date||mn.includes(x.date.getMonth()+1));
+  if(withDate.length>0)arr=arr.filter(x=>!x.date||mn.includes(bMonat(x.date)));
   if(!arr.length)return{avg:0,n:0,available:true};
   const avg=arr.reduce((s,x)=>s+x.nps,0)/arr.length;
   return{avg,n:arr.length,available:true};
@@ -1056,11 +1125,11 @@ function getBWAMonths(){
 function ausfDaten(){
   const nr=new Map();
   (Array.isArray(D.mfRe)?D.mfRe:[]).forEach(f=>((f&&f.rechnungen)||[]).forEach(r=>{if(r&&r.Nr)nr.set(String(r.Nr),r);}));
-  const heute=new Date();heute.setHours(0,0,0,0);
+  const heute=clHeute();
   const A=[...nr.values()].filter(r=>r.KostentraegerTyp==='Ausfall'&&String(r.Nr).startsWith('K-')
     &&/^rechnung/i.test(String(r.Belegtyp||''))&&!r.Storniert);
   const st=[...nr.values()].filter(r=>r.KostentraegerTyp==='Ausfall'&&String(r.Nr).startsWith('K-')&&/^storno/i.test(String(r.Belegtyp||'')));
-  return A.map(r=>{const zz=r.Zahlungsziel?new Date(String(r.Zahlungsziel).slice(0,10)+'T00:00:00'):null;
+  return A.map(r=>{const zz=r.Zahlungsziel?reTag(String(r.Zahlungsziel).slice(0,10)):null;
     const saldo=+r.Saldo||0;
     return{nr:String(r.Nr),ds:String(r.Belegdatum||'').slice(0,10),patient:String(r.Patient||''),brutto:+r.Brutto||0,saldo,
       offen:saldo>0.005,ueber:saldo>0.005&&zz&&zz<heute,ziel:zz,mahn:r.Mahnstufe||null};})
@@ -1078,7 +1147,7 @@ function rAusfall(){
   const off=re.filter(x=>x.offen),ueb=off.filter(x=>x.ueber),mahn=off.filter(x=>x.mahn);
   const bez=re.filter(x=>!x.offen);
   const kachel=(l,v,sub,c)=>'<div class="kpi-k"><div class="kpi-l">'+l+'</div><div class="kpi-v"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div><div class="kpi-s">'+sub+'</div></div>';
-  let h='<div class="st">Ausfallrechnungen <span class="sub">Kitzingen · '+new Date().getFullYear()+' · Medifox-Rechnungen</span></div>'
+  let h='<div class="st">Ausfallrechnungen <span class="sub">Kitzingen · '+bJahr(new Date())+' · Medifox-Rechnungen</span></div>'
     +'<div class="kpi-reihe">'
     +kachel('Gestellt',re.length,eur(sum(re,'brutto')))
     +kachel('Bezahlt',bez.length,eur(sum(bez,'brutto')),'var(--green)')
@@ -1153,7 +1222,7 @@ function rOKR(){
   ms.forEach(m=>{if(kK[m]&&(aF==='Alle'||aF.includes('KIMOJO'))){bf+=kK[m].befund;dk+=kK[m].doku;kc++;}if(kP[m]&&(aF==='Alle'||aF==='PHFIP')){bf+=kP[m].befund;dk+=kP[m].doku;kc++;}});
   if(kc>0){bf/=kc;dk/=kc;}
   // Feedback - include current month too
-  const fbF=D.fb.filter(f=>f.date.getFullYear()===2026&&mn.includes(f.date.getMonth()+1)&&f.stars>0);
+  const fbF=D.fb.filter(f=>bJahr(f.date)===2026&&mn.includes(bMonat(f.date))&&f.stars>0);
   const avgFb=fbF.length?fbF.reduce((s,f)=>s+f.stars,0)/fbF.length:0;
   // Auslastung (mit Standort+Monats-/Quartalsfilter)
   const avgA=getAvgAuslastung();
@@ -1190,7 +1259,7 @@ function rOKR(){
 
 function rPM(){
   const ms=getMs(),mn=getMNums();
-  const fbF=D.fb.filter(f=>f.date.getFullYear()===2026&&mn.includes(f.date.getMonth()+1)&&f.stars>0);
+  const fbF=D.fb.filter(f=>bJahr(f.date)===2026&&mn.includes(bMonat(f.date))&&f.stars>0);
   const avgFb=fbF.length?fbF.reduce((s,f)=>s+f.stars,0)/fbF.length:0;
   const standortMed=aF==='PHFIP'?'PHFIP':aF==='KIMOJO Physio'||aF==='KIMOJO Ergo'?'KIMOJO':'Alle';
   const offene=getOffene(standortMed);
@@ -1252,7 +1321,7 @@ function rAusl(){
   document.getElementById('auslD').innerHTML=cd('KW '+sKW,kwK?kwK.physio:null,kwK?kwK.ergo:null,kwP?kwP.physio:null)+cd('ø '+(mo||'Monat'),avg(kM,'physio'),avg(kM.filter(d=>d.ergo!==null),'ergo'),avg(pM,'physio'))+cd('ø '+(aM==='YTD'?'YTD':aM),avg(kY,'physio'),avg(kY.filter(d=>d.ergo!==null),'ergo'),avg(pY,'physio'));
 }
 function rFB(){
-  const recent=D.fb.filter(f=>f.date.getFullYear()>=2025).sort((a,b)=>b.date-a.date).slice(0,6);
+  const recent=D.fb.filter(f=>bJahr(f.date)>=2025).sort((a,b)=>b.date-a.date).slice(0,6);
   document.getElementById('fbD').innerHTML=recent.map(f=>{const s='★'.repeat(Math.round(f.stars))+'☆'.repeat(5-Math.round(f.stars));const d=f.date.toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'numeric'});return`<div class="fb-card"><div class="fb-stars">${s}</div><div class="fb-text">"${(f.text||'—').slice(0,100)}"</div><div class="fb-meta"><span>${f.name||'Anonym'}</span><span>${d}</span></div></div>`;}).join('')||'<p style="color:var(--muted)">Keine Bewertungen.</p>';
 }
 let thTeam='Alle';
@@ -1325,7 +1394,15 @@ const qmKurz=mail=>(QM_LEITUNG.find(l=>l.mail===mail)||{}).kurz||'';
 function qmMein(th){const me=qmMe();if(!me||!QM.nurMeine)return true;return qmZu()[th]===me.mail;}
 
 // --- ISO-Kalenderwoche für beliebiges Datum ---
-function kwOf(dt){const d=new Date(dt);d.setHours(0,0,0,0);d.setDate(d.getDate()+3-(d.getDay()+6)%7);const w=new Date(d.getFullYear(),0,4);return{kw:1+Math.round(((d.getTime()-w.getTime())/864e5-3+(w.getDay()+6)%7)/7),jahr:d.getFullYear()};}
+function kwOf(dt){
+  const p=tzParts(dt instanceof Date?dt:new Date(dt)); if(!p)return{kw:0,jahr:0};
+  const wd=p.wd===0?7:p.wd;
+  const thu=new Date(Date.UTC(p.y,p.m-1,p.d+(4-wd)));
+  const y=thu.getUTCFullYear();
+  const jan4=new Date(Date.UTC(y,0,4)), jan4wd=jan4.getUTCDay()||7;
+  const week1=Date.UTC(y,0,4-(jan4wd-1));
+  return {kw:1+Math.round((thu.getTime()-week1)/864e5/7), jahr:y};
+}
 function seedRnd(str){let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))|0;return((h>>>0)%100000)/100000;}
 
 // --- Laden / Speichern (JSON-Datei via Graph im KIMOJOManagement-Drive) ---
@@ -1392,26 +1469,25 @@ function qmSoMatch(standort){const so=String(standort||'');
 // Zeitleiste des Club-Reiters: ein Tag, eine Woche oder ein frei gewaehlter
 // Zeitraum. Die Ansicht je Standort merkt sich, welcher Reiter offen ist.
 let CL={modus:'T',tag:null,von:null,bis:null,ansicht:{w:'reise',k:'reise'}};
-function clHeute(){const d=new Date();d.setHours(0,0,0,0);return d;}
-function clMontag(d){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x;}
+function clHeute(){const p=tzParts(new Date());return tzWall(p.y,p.m-1,p.d);}
+function clMontag(d){const p=tzParts(d),wd=p.wd===0?7:p.wd;const u=new Date(Date.UTC(p.y,p.m-1,p.d-(wd-1)));return tzWall(u.getUTCFullYear(),u.getUTCMonth(),u.getUTCDate());}
 function clBereich(){
   let von,bis;
-  if(CL.modus==='T'){von=new Date(CL.tag);bis=new Date(CL.tag);}
-  else if(CL.modus==='W'){von=clMontag(CL.tag);bis=new Date(von);bis.setDate(bis.getDate()+6);}
-  else{von=new Date(CL.von);bis=new Date(CL.bis);}
-  von.setHours(0,0,0,0);bis.setHours(23,59,59,999);
+  if(CL.modus==='T'){von=bStart(CL.tag);bis=bEndOf(CL.tag);}
+  else if(CL.modus==='W'){von=clMontag(CL.tag);bis=bEndOf(bAddDays(von,6));}
+  else{von=bStart(CL.von);bis=bEndOf(CL.bis);}
   return{von,bis};
 }
 // Tage ueberspringen Wochenenden — da ist die Praxis zu. In die Zukunft geht
 // es nicht: Fuer morgen gibt es noch keine Gespraeche.
-function clNaechsterWerktag(d){const x=new Date(d);x.setHours(0,0,0,0);do{x.setDate(x.getDate()+1);}while(x.getDay()===0||x.getDay()===6);return x;}
+function clNaechsterWerktag(d){let x=bStart(d);do{x=bAddDays(x,1);}while(bWD(x)===0||bWD(x)===6);return x;}
 // Ein Tag nach vorne geht: der naechste Therapietag als Vorschau.
 function clSchritt(n){
   const h=clHeute();
-  if(CL.modus==='T'){const d=new Date(CL.tag);
-    do{d.setDate(d.getDate()+n);}while(d.getDay()===0||d.getDay()===6);
+  if(CL.modus==='T'){let d=new Date(CL.tag);
+    do{d=bAddDays(d,n);}while(bWD(d)===0||bWD(d)===6);
     if(d>clNaechsterWerktag(h))return;CL.tag=d;}
-  else if(CL.modus==='W'){const d=new Date(CL.tag);d.setDate(d.getDate()+7*n);
+  else if(CL.modus==='W'){const d=bAddDays(CL.tag,7*n);
     if(clMontag(d)>h)return;CL.tag=d;}
   rClub();
 }
@@ -1419,25 +1495,25 @@ function clModus(m){CL.modus=m;rClub();}
 function clZuHeute(){CL.tag=clHeute();rClub();}
 function clZeitraum(){
   const v=document.getElementById('clVon'),b=document.getElementById('clBis');
-  const p=x=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(x||'');return m?new Date(+m[1],+m[2]-1,+m[3]):null;};
+  const p=x=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(x||'');return m?tzWall(+m[1],+m[2]-1,+m[3]):null;};
   const dv=p(v&&v.value),db=p(b&&b.value);
   if(dv&&db&&dv<=db){CL.von=dv;CL.bis=db;rClub();}
 }
 function clAnsicht(k,a){CL.ansicht[k]=a;rClub();}
 // Strichliste: bis zu einem Monat Tag fuer Tag, darueber Woche fuer Woche.
-function clTageweise(){if(CL.modus!=='Z')return true;const{von,bis}=clBereich();return(bis-von)<=31*864e5;}
+function clTageweise(){if(CL.modus!=='Z')return true;const{von,bis}=clBereich();const a=tzParts(von),b=tzParts(bis);return(Date.UTC(b.y,b.m-1,b.d)-Date.UTC(a.y,a.m-1,a.d))/864e5<=31;}
 function rClub(){
   const el=document.getElementById('clD');if(!el)return;
   const h0=clHeute();
-  if(!CL.tag){CL.tag=new Date(h0);while(CL.tag.getDay()===0||CL.tag.getDay()===6)CL.tag.setDate(CL.tag.getDate()-1);}
-  if(!CL.von){CL.von=new Date(h0.getFullYear(),h0.getMonth(),1);CL.bis=new Date(h0);}
+  if(!CL.tag){CL.tag=new Date(h0);while(bWD(CL.tag)===0||bWD(CL.tag)===6)CL.tag=bAddDays(CL.tag,-1);}
+  if(!CL.von){const p=tzParts(h0);CL.von=tzWall(p.y,p.m-1,1);CL.bis=new Date(h0);}
   const{von,bis}=clBereich();
-  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const iso=d=>bYMD(d);
   const fD=d=>d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
   let titel;
   if(CL.modus==='T')titel=CL.tag.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})+(+CL.tag===+h0?' · heute':CL.tag>h0?' · Vorschau':'');
   else if(CL.modus==='W'){const w=kwOf(von);titel='KW '+w.kw+' · '+fD(von)+' – '+fD(bis)+(von<=h0&&h0<=bis?' · laufende Woche':'');}
-  else titel=fD(von)+'.'+von.getFullYear()+' – '+fD(bis)+'.'+bis.getFullYear();
+  else titel=fD(von)+'.'+bJahr(von)+' – '+fD(bis)+'.'+bJahr(bis);
   const nav=document.getElementById('clNav');
   if(nav)nav.innerHTML='<div class="cl-nav-l">'
     +(CL.modus==='Z'
@@ -1624,7 +1700,7 @@ function mgAnsicht(ortRe,von,bis){
   if(!ort)return '<div class="qm-empty">Noch keine Gruppendaten aus dem CRM. Der Flow legt sie stündlich unter MyWellness/&lt;Club&gt;/Gruppen ab.</div>';
   const heute=clHeute(),fD=d=>d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
   const ende=bis>=heute?{status:'da',gruppen:MG.orte[ort].gruppen,jetzt:true}:mgTag(ort,bis);
-  const vt=new Date(von);vt.setDate(vt.getDate()-1);
+  const vt=bAddDays(von,-1);
   const vorher=reIso(vt)<MG_VERLAUF_AB?{status:'fehlt'}:mgTag(ort,vt);
   let h='';
   if(ende.status==='laedt'||vorher.status==='laedt')h+='<div class="re-leise">Lade Verlauf …</div>';
@@ -1677,10 +1753,10 @@ function reNorm(s){
   return String(s||'').toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
     .normalize('NFKD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z]+/).filter(w=>w.length>1).sort().join(' ');
 }
-function reTag(ds){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(ds||'');return m?new Date(+m[1],+m[2]-1,+m[3]):null;}
-function reIso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function rePlusWerktage(d,n){const x=new Date(d);x.setHours(0,0,0,0);while(n>0){x.setDate(x.getDate()+1);const w=x.getDay();if(w!==0&&w!==6)n--;}return x;}
-function reWerktageZwischen(a,b){let n=0;const x=new Date(a);x.setHours(0,0,0,0);while(x<b){x.setDate(x.getDate()+1);const w=x.getDay();if(w!==0&&w!==6&&x<=b)n++;}return n;}
+function reTag(ds){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(ds||'');return m?tzWall(+m[1],+m[2]-1,+m[3]):null;}
+function reIso(d){return bYMD(d);}
+function rePlusWerktage(d,n){let x=bStart(d);while(n>0){x=bAddDays(x,1);const w=bWD(x);if(w!==0&&w!==6)n--;}return x;}
+function reWerktageZwischen(a,b){let n=0;let x=bStart(a);const end=bStart(b);while(x<end){x=bAddDays(x,1);const w=bWD(x);if(w!==0&&w!==6&&x<=end)n++;}return n;}
 // Aus den Tageslisten die Faelle: einer je Rezept. Spaetere Tage gewinnen —
 // wer am vorletzten Termin noch keinen Folgetermin hatte und am letzten schon,
 // hat einen.
@@ -1718,7 +1794,7 @@ function reMwIndex(mw){
 // konnte gar kein Gespraech im Fragebogen bekommen — "ueberfaellig" waere eine
 // erfundene Luecke. Solche Faelle heissen "vorher" und werden nicht bewertet.
 function reStand(f,ix,heute,start){
-  const ab=reTag(f.ab),fenster=new Date(ab);fenster.setDate(fenster.getDate()-14);
+  const ab=reTag(f.ab),fenster=bAddDays(ab||new Date(0),-14);
   const treffer=(ix.nm[reNorm(f.name)]||[]).filter(r=>r.dt>=fenster).sort((a,b)=>a.dt-b.dt);
   const ids=[...new Set(treffer.map(r=>r.id).filter(Boolean))];
   let schritte=treffer;
@@ -1735,7 +1811,7 @@ function reStand(f,ix,heute,start){
   // Fragebogen kam erst nach Ablauf der zwei Werktage. Das ist meist die
   // Rueckmeldung, die beim Therapeuten haengt.
   let spaet=0;
-  if(status==='erfasst'&&frist){const d0=new Date(schritte[0].dt);d0.setHours(0,0,0,0);if(d0>frist)spaet=reWerktageZwischen(frist,d0);}
+  if(status==='erfasst'&&frist){const d0=bStart(schritte[0].dt);if(d0>frist)spaet=reWerktageZwischen(frist,d0);}
   return Object.assign({},f,{status,schritte,frist,spaet,mehrdeutig:ids.length>1,
     letzter:schritte.length?schritte[schritte.length-1]:null});
 }
@@ -1894,7 +1970,7 @@ function reAnsicht(locIds,ortRe,von,bis,jetzt,tageQuelle){
   const erster=listenTage[0];
   const mw=(D.mw||[]).filter(r=>!r.standort||ortRe.test(r.standort));
   const ix=reMwIndex(mw);
-  const start=mw.length?(()=>{const d=new Date(Math.min(...mw.map(r=>+r.dt)));d.setHours(0,0,0,0);return d;})():null;
+  const start=mw.length?bStart(new Date(Math.min(...mw.map(r=>+r.dt)))):null;
   const alle=reFaelle(QT,locIds).map(f=>reStand(f,ix,heute,start));
   // Von Hand ausgeblendet (Dauerpatient, Hausbesuch, …): zaehlt nicht mehr
   // als faellig, steht aber mit Grund unten in "Ausgeblendet".
@@ -2161,7 +2237,7 @@ function mwStrich(von,bis,ortRe){
   const alle=(D.mw||[]).filter(r=>!ortRe||!r.standort||ortRe.test(r.standort));
   if(!alle.length)return '<div class="qm-note">Für diesen Standort liegen keine Gesprächsdaten aus MyWellness vor. '
     +'Der Flow legt sie stündlich unter <b>'+esc(MW_DIR)+'&lt;Standort&gt;/</b> ab.</div>';
-  const start=new Date(Math.min(...alle.map(r=>+r.dt)));start.setHours(0,0,0,0);
+  const start=bStart(new Date(Math.min(...alle.map(r=>+r.dt))));
   const heute=clHeute();
   const stufen=[...new Set(alle.map(r=>r.stufe).filter(x=>x))].sort();
   const basis=MW.stufe?alle.filter(r=>r.stufe===MW.stufe):alle;
@@ -2179,18 +2255,18 @@ function mwStrich(von,bis,ortRe){
     +'</b>. Für die Zeit davor gibt es keine CRM-Zahlen; sie werden nicht als 0 gezählt.</div>';
   if(bis<start)return h;
   // Zeilen: Tage (bis ein Monat) oder Kalenderwochen, nur ab CRM-Start und nicht in der Zukunft
-  const ab=new Date(Math.max(+von,+start)),bisT=new Date(Math.min(+bis,+heute+864e5-1));
+  const ab=new Date(Math.max(+von,+start)),bisT=new Date(Math.min(+bis,+bEndOf(heute)));
   const zeilen=[];
   if(clTageweise()){
-    for(let d=new Date(ab);d<=bisT;d.setDate(d.getDate()+1)){
-      const e=new Date(d);e.setHours(23,59,59,999);
+    for(let d=bStart(ab);d<=bisT;d=bAddDays(d,1)){
+      const e=bEndOf(d);
       const R=basis.filter(r=>r.dt>=d&&r.dt<=e);
-      if((d.getDay()===0||d.getDay()===6)&&!R.length)continue;
+      if((bWD(d)===0||bWD(d)===6)&&!R.length)continue;
       zeilen.push({l:fD(d),R});
     }
   }else{
-    for(let m=clMontag(ab);m<=bisT;m.setDate(m.getDate()+7)){
-      const a=new Date(Math.max(+m,+ab)),e=new Date(m);e.setDate(e.getDate()+6);e.setHours(23,59,59,999);
+    for(let m=clMontag(ab);m<=bisT;m=bAddDays(m,7)){
+      const a=new Date(Math.max(+m,+ab)),e=bEndOf(bAddDays(m,6));
       const R=basis.filter(r=>r.dt>=a&&r.dt<=e&&r.dt<=bisT);
       zeilen.push({l:'KW '+kwOf(m).kw,R});
     }
@@ -2270,12 +2346,12 @@ function mwStufe(name){
   const m=String(name||'').match(/(\d)\s*\.\s*gespr/i);
   return m?+m[1]:null;
 }
-// "19.10.26 11:38" — zweistelliges Jahr, Tag zuerst.
+// "19.10.26 11:38" oder "22.10.2026 11:49:58" — Tag zuerst, Berliner Ortszeit.
 function mwDatum(s){
-  const m=String(s||'').trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  const m=String(s||'').trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if(!m)return null;
   const j=+m[3]<100?2000+ +m[3]:+m[3];
-  const d=new Date(j,+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0));
+  const d=tzWall(j,+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0));
   return isNaN(d.getTime())?null:d;
 }
 // Eine Exportdatei in Saetze zerlegen. Semikolon-CSV mit Anfuehrungszeichen.
@@ -2367,7 +2443,7 @@ const MW_STAND={};
 function mwStandText(ortRe){
   const t=Object.keys(MW_STAND).filter(o=>!ortRe||ortRe.test(o)).map(o=>MW_STAND[o]).sort((a,b)=>b-a)[0];
   if(!t)return '';
-  const h=new Date();h.setHours(0,0,0,0);
+  const h=clHeute();
   const tag=t>=h?'heute':t.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
   const alt=(Date.now()-t)>2*3600e3;
   return '<span class="re-leise"'+(alt?' style="color:#c03b35"':'')+'>MyWellness-Stand: '+tag+' '
@@ -2416,7 +2492,7 @@ function mwNotizKey(id,stufe,datum){
   let d=datum;
   if(!(d instanceof Date))d=mwDatum(String(datum||''));
   if(!d||isNaN(d))return null;
-  return String(id).trim()+'|'+stufe+'|'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+  return String(id).trim()+'|'+stufe+'|'+bYMD(d).replace(/-/g,'');
 }
 // Haengt jede Anmerkung an ihr Gespraech. notiz bleibt undefined, wenn keine
 // abgerufen wurde, und ist '', wenn im Fragebogen nichts eingetragen war.
@@ -2484,7 +2560,14 @@ function qmAussen(lst){
 }
 
 // --- Wochen-Daten: Ersttermine + Doku-Kandidaten ---
-function qmWeekBounds(kw,jahr){const j4=new Date(jahr,0,4);const mo=new Date(j4);mo.setDate(j4.getDate()-(j4.getDay()+6)%7+(kw-1)*7);mo.setHours(0,0,0,0);const so=new Date(mo);so.setDate(mo.getDate()+6);so.setHours(23,59,59,999);return{mo,so};}
+function qmWeekBounds(kw,jahr){
+  const jan4=new Date(Date.UTC(jahr,0,4)),jan4wd=jan4.getUTCDay()||7;
+  const mon=new Date(Date.UTC(jahr,0,4-(jan4wd-1)+(kw-1)*7));
+  const mo=tzWall(mon.getUTCFullYear(),mon.getUTCMonth(),mon.getUTCDate());
+  const sun=new Date(Date.UTC(mon.getUTCFullYear(),mon.getUTCMonth(),mon.getUTCDate()+6));
+  const so=tzWall(sun.getUTCFullYear(),sun.getUTCMonth(),sun.getUTCDate(),23,59,59,999);
+  return{mo,so};
+}
 function qmWeekData(){
   // Regionsfilter: Allgemein = beide Quellen, sonst nur Kitzingen (Excel/F4) bzw. Werneck (thevea)
   let T=(D.qmTermine||[]).filter(t=>REG==='Allgemein'||(t.region||'Kitzingen')===REG);
@@ -2507,7 +2590,7 @@ function qmWeekData(){
   const legacy=T.filter(t=>t.erst===undefined);
   const dataMin=legacy.length?new Date(Math.min(...legacy.map(t=>t.dt.getTime()))):null;
   const byPos={};legacy.forEach(t=>{if(!t.pos)return;if(!byPos[t.pos]||t.dt<byPos[t.pos].dt||(t.dt.getTime()===byPos[t.pos].dt.getTime()&&t.uz<byPos[t.pos].uz))byPos[t.pos]=t;});
-  const guard=dataMin?new Date(dataMin.getTime()+3*864e5):null;
+  const guard=dataMin?bAddDays(bStart(dataMin),3):null;
   const erstL=Object.values(byPos).filter(t=>!t.dup&&t.dt>=mo&&t.dt<=so&&(!guard||t.dt>guard));
   // Zustaendigkeit: eingeloggte Leitung sieht nur die ihr zugeteilten Therapeut:innen
   const erst=flagged.concat(erstL).filter(t=>qmMein(t.th));
@@ -2535,7 +2618,7 @@ function qmWeekData(){
 // eigenen – das 5/5-Ziel gilt je Leitung, nicht fuer das Team zusammen.
 function qmDone(typ){const me=qmMe();
   return QM.data.kontrollen.filter(k=>k.typ===typ&&k.kw===QM.kw&&k.jahr===QM.jahr&&(REG==='Allgemein'||(k.region||'Kitzingen')===REG)&&(!me||!QM.nurMeine||k.leitung===me.mail));}
-function qmChW(d){if(QM.kw===null)return;let kw=QM.kw+d,j=QM.jahr;if(kw<1){j--;kw=kwOf(new Date(j,11,28)).kw;}else if(kw>kwOf(new Date(j,11,28)).kw){j++;kw=1;}const cur=kwOf(new Date());if(j>cur.jahr||(j===cur.jahr&&kw>cur.kw))return;QM.kw=kw;QM.jahr=j;QM.showAllB=false;QM.showAllD=false;QM.openD={};rQM();}
+function qmChW(d){if(QM.kw===null)return;let kw=QM.kw+d,j=QM.jahr;if(kw<1){j--;kw=kwOf(tzWall(j,11,28)).kw;}else if(kw>kwOf(tzWall(j,11,28)).kw){j++;kw=1;}const cur=kwOf(new Date());if(j>cur.jahr||(j===cur.jahr&&kw>cur.kw))return;QM.kw=kw;QM.jahr=j;QM.showAllB=false;QM.showAllD=false;QM.openD={};rQM();}
 
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtD=d=>d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});
@@ -2584,7 +2667,7 @@ function rQM(){
   let listD=[...doku];
   if(!QM.showAllD&&listD.length>8){const vis=listD.slice(0,QM_ZIEL).concat(listD.slice(QM_ZIEL).filter(x=>doneD[x.th]));var hidD=listD.length-vis.length;listD=vis;}
   // Je Termin erledigt? (Therapeut:in + Tag + Uhrzeit + Patient:in) – erlaubt weitere Kontrollen derselben Person
-  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const ymd=d=>bYMD(d);
   const doneT={};dD.forEach(k=>{doneT[k.therapeut+'|'+k.terminDatum+'|'+k.uhrzeit+'|'+k.patient]=k;});
   const dh=listD.map((x,i)=>{
     const k=doneD[x.th];const idx=doku.indexOf(x);
@@ -2598,7 +2681,7 @@ function rQM(){
       if(kt){const st=qmStufe(kt.prozent);return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(t.pat)}</div><div class="qm-t2">${t2}</div></div><span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${kt.prozent}%</span></div>`;}
       return`<div class="qm-item" onclick="qmOpen('doku','${thA}',${ti})"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(t.pat)}</div><div class="qm-t2">${t2}</div></div>${t===x.t?'<span class="qm-tag">Vorschlag</span>':''}</div>`;
     }).join('')+'</div>':'';
-    if(k){const st=qmStufe(k.prozent);const kd=k.terminDatum?fmtD(new Date(k.terminDatum+'T00:00'))+' '+(k.uhrzeit||''):fmtD(x.t.dt)+' '+x.t.uz;return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(x.th)}</div><div class="qm-t2">${esc(k.patient||x.t.pat)} · ${kd}</div></div>${alt}<span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${k.prozent}%</span></div>${sub}`;}
+    if(k){const st=qmStufe(k.prozent);const kd=k.terminDatum?fmtD(reTag(k.terminDatum))+' '+(k.uhrzeit||''):fmtD(x.t.dt)+' '+x.t.uz;return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(x.th)}</div><div class="qm-t2">${esc(k.patient||x.t.pat)} · ${kd}</div></div>${alt}<span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${k.prozent}%</span></div>${sub}`;}
     return`<div class="qm-item${idx<QM_ZIEL?' sugg':''}" onclick="qmOpen('doku','${thA}')"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(x.th)}</div><div class="qm-t2">${esc(x.t.pat)} · ${fmtD(x.t.dt)} ${x.t.uz}${soTag(x.t)} · ${lastTxt}</div></div>${alt}${idx<QM_ZIEL?'<span class="qm-tag">Dran</span>':''}</div>${sub}`;
   }).join('');
   document.getElementById('qmListD').innerHTML=naHint+(dh||(naW>0?'':'<div class="qm-empty">Keine Termine in dieser Woche gefunden.</div>'))+(!QM.showAllD&&typeof hidD!=='undefined'&&hidD>0?`<div class="qm-more" onclick="QM.showAllD=true;rQM()">+ ${hidD} weitere Therapeut:innen anzeigen</div>`:'');
@@ -2707,7 +2790,7 @@ async function qmSubmit(){
   const rec={
     id:Date.now()+'-'+Math.random().toString(36).slice(2,8),
     typ:c.typ,therapeut:c.t.th,patient:c.t.pat,posNr:c.t.pos,leistung:c.t.lst,standort:c.t.standort,region:c.t.region||'Kitzingen',
-    terminDatum:c.t.dt.getFullYear()+'-'+String(c.t.dt.getMonth()+1).padStart(2,'0')+'-'+String(c.t.dt.getDate()).padStart(2,'0'),uhrzeit:c.t.uz,
+    terminDatum:bYMD(c.t.dt),uhrzeit:c.t.uz,
     kw:QM.kw,jahr:QM.jahr,datum:new Date().toISOString(),
     pruefer:(ml.getActiveAccount()||{}).name||'',
     leitung:qmMail(), // Login-E-Mail: macht das 5/5-Ziel je Leitung zaehlbar
@@ -2723,9 +2806,9 @@ async function qmSubmit(){
 
 // --- Auswertung / Historie ---
 function qmAnFilter(){
-  let ks=QM.data.kontrollen.filter(k=>k.jahr===(QM.anZeit==='YTD'||Q_MAP[QM.anZeit]?new Date().getFullYear():k.jahr));
+  let ks=QM.data.kontrollen.filter(k=>k.jahr===(QM.anZeit==='YTD'||Q_MAP[QM.anZeit]?bJahr(new Date()):k.jahr));
   if(QM.anZeit==='Alles')ks=QM.data.kontrollen;
-  else if(Q_MAP[QM.anZeit]){const mns=Q_MAP[QM.anZeit].map(m=>MN.indexOf(m));ks=ks.filter(k=>mns.includes(new Date(k.datum).getMonth()));}
+  else if(Q_MAP[QM.anZeit]){const mns=Q_MAP[QM.anZeit].map(m=>MN.indexOf(m));ks=ks.filter(k=>k.datum&&mns.includes(bMonat(new Date(k.datum))-1));}
   if(QM.anTyp!=='beide')ks=ks.filter(k=>k.typ===QM.anTyp);
   if(REG!=='Allgemein')ks=ks.filter(k=>(k.region||'Kitzingen')===REG);
   if(aF!=='Alle')ks=ks.filter(k=>qmSoMatch(k.standort));
@@ -2962,7 +3045,7 @@ async function loadJSONPfad(f){
   if(!r.ok)return null;
   return JSON.parse((await r.text()).replace(/^﻿/,''));
 }
-function kennMonatStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function kennMonatStr(d){const p=tzParts(d);return bYM(p.y,p.m-1);}
 // Sechs Monate. Mehr braucht die Zeitraumwahl nicht, und sechs kleine Dateien
 // parallel zu holen kostet weniger als eine Excel-Tabelle.
 // Ein Jahr und der laufende Monat — jeder Tag der letzten zwölf Monate soll
@@ -2974,9 +3057,9 @@ async function kennLade(){
   return aus;
 }
 async function kennLadeEine(dir){
-  const j=new Date(),monate=[];
+  const j=tzParts(new Date()),monate=[];
   for(let i=KENN_MONATE-1;i>=0;i--)
-    monate.push(kennMonatStr(new Date(j.getFullYear(),j.getMonth()-i,1)));
+    monate.push(bYM(j.y,j.m-1-i));
   const dateien=await Promise.all(monate
     .map(m=>loadJSONPfad(dir+'kennzahlen-'+m+'.json').catch(()=>null)));
   const proTag={};let stand=0,fremdeFassung=null;
@@ -3096,12 +3179,12 @@ function pmTracker(ds){
 }
 
 function pmDatum(ds){
-  const d=new Date(ds+'T12:00:00');
-  return isNaN(d)?ds:d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const d=reTag(ds);
+  return !d||isNaN(d)?ds:d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
 }
 function pmKurz(ds){
-  const d=new Date(ds+'T12:00:00');
-  return isNaN(d)?ds:d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}).replace(',','');
+  const d=reTag(ds);
+  return !d||isNaN(d)?ds:d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}).replace(',','');
 }
 const pmLeer='<span style="font-size:15px;font-weight:500;color:var(--faint)">keine Eingabe</span>';
 function pmUB(v,gut,mittel){
@@ -3130,8 +3213,7 @@ let pmZeit='tag',pmVon='',pmBis='';
 // verschieben ihn, die Einheit darüber entscheidet, was um ihn herum gezeigt
 // wird — ein Tag, seine Woche oder sein Monat.
 let pmTag='';
-function pmISO(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
-  +'-'+String(d.getDate()).padStart(2,'0');}
+function pmISO(d){return bYMD(d);}
 function pmSetZeit(z){
   // „Heute" heißt heute. Wer von der Wochenansicht zurückkommt, will den
   // aktuellen Tag sehen und nicht den, auf dem er vorhin stehen geblieben ist.
@@ -3166,9 +3248,8 @@ function pmZiel(d){
     return(j>=0&&j<L.length)?L[j]:'';
   }
   const sp=pmSpanne();if(!sp)return'';
-  const a=new Date(pmBereich().von+'T12:00:00');
-  if(pmZeit==='woche')a.setDate(a.getDate()+7*d);else a.setMonth(a.getMonth()+d);
-  const neu=pmISO(a);
+  const start=reTag(pmBereich().von);
+  const neu=pmZeit==='woche'?bYMD(bAddDays(start,7*d)):bYMD(bAddMonths(start,d));
   // Nur springen, wenn der neue Bereich die vorhandenen Daten überhaupt noch
   // berührt. Sonst stünde man vor einer leeren Seite ohne Weg zurück.
   const merk=pmTag;pmTag=neu;
@@ -3195,17 +3276,18 @@ function pmLetzterTag(){
   return pmISO(new Date());
 }
 function pmBereich(){
-  const l=pmTag||pmLetzterTag(),d=new Date(l+'T12:00:00');
+  const l=pmTag||pmLetzterTag(),d=reTag(l);
+  if(!d)return{von:l,bis:l,label:l};
   if(pmZeit==='woche'){
-    // Montag bis Sonntag der Woche, in der der letzte vollständige Tag liegt.
-    const mo=new Date(d);mo.setDate(d.getDate()-((d.getDay()+6)%7));
-    const so=new Date(mo);so.setDate(mo.getDate()+6);
-    return{von:pmISO(mo),bis:pmISO(so),label:'Woche '+pmKurz(pmISO(mo))+' – '+pmKurz(pmISO(so))};
+    const mo=clMontag(d),so=bAddDays(mo,6);
+    return{von:bYMD(mo),bis:bYMD(so),label:'Woche '+pmKurz(bYMD(mo))+' – '+pmKurz(bYMD(so))};
   }
   if(pmZeit==='monat'){
-    const a=new Date(d.getFullYear(),d.getMonth(),1),e=new Date(d.getFullYear(),d.getMonth()+1,0);
-    return{von:pmISO(a),bis:pmISO(e),
-      label:d.toLocaleDateString('de-DE',{month:'long',year:'numeric'})};
+    const p=tzParts(d),a=tzWall(p.y,p.m-1,1);
+    const last=new Date(Date.UTC(p.y,p.m,0));
+    const e=tzWall(last.getUTCFullYear(),last.getUTCMonth(),last.getUTCDate());
+    return{von:bYMD(a),bis:bYMD(e),
+      label:a.toLocaleDateString('de-DE',{month:'long',year:'numeric'})};
   }
   if(pmZeit==='frei'){
       const v=pmVon||l,b=pmBis||l;
@@ -3218,8 +3300,8 @@ function pmBereich(){
 // in der Reihe ein Wochenende war oder ein Tag, an dem niemand das Dashboard
 // offen hatte.
 function pmWerktage(von,bis){
-  let n=0;const d=new Date(von+'T12:00:00'),e=new Date(bis+'T12:00:00');
-  while(d<=e){const w=d.getDay();if(w>=1&&w<=5)n++;d.setDate(d.getDate()+1);}
+  let n=0;let d=reTag(von),e=reTag(bis);if(!d||!e)return 0;
+  while(d<=e){const w=bWD(d);if(w>=1&&w<=5)n++;d=bAddDays(d,1);}
   return n;
 }
 
@@ -3249,7 +3331,7 @@ function pmAgg(tage){
       // Lücken nach Wochentag. Gezählt wird auch, wie oft der Wochentag im
       // Zeitraum vorkam — sonst sieht ein Montag aus drei Wochen dreimal so
       // schlimm aus wie ein einzelner Freitag.
-      const wt=PM_WT[new Date(t.ds+'T12:00:00').getDay()];
+      const wt=PM_WT[bWD(reTag(t.ds))];
       const w=Z.luWt[wt]||(Z.luWt[wt]={min:0,tage:0});
       w.tage++;
       Object.keys(t.loc).forEach(k=>{

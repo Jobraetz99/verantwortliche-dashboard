@@ -461,6 +461,8 @@ tbody tr:hover{background:var(--sunken)}
 .ausf-tab tr.ausf-ueber td{background:var(--red-bg)}
 .ausf-kopf{font-size:13px;font-weight:600;margin:16px 0 8px}.ausf-kopf small{font-weight:400;color:var(--muted);margin-left:6px}
 .ausf-fuss{font-size:11.5px;color:var(--muted);margin:-2px 0 18px;line-height:1.5}
+#praxisBody .hk-vgl{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:9px;border-top:1px solid var(--hairline);font-size:12px;color:var(--muted)}
+#praxisBody .hk-vgl b{color:var(--dark);font-weight:650;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -2859,7 +2861,10 @@ function pmSetBetrieb(k){pmBetrieb=k;rPraxis();}
 // in Wahrheit gelten.
 function pmQ(){
   const q=D.pmKenn||{};
+  // '_q:<quelle>' wählt alle Betriebe EINER Quelle (für den Vergleich der
+  // Häuser bei „Alle", siehe pmVergleich).
   const liste=(pmBetrieb==='alle')?PM_BETRIEBE.filter(pmHatQuelle)
+    :String(pmBetrieb).startsWith('_q:')?PM_BETRIEBE.filter(b=>b.q===pmBetrieb.slice(3)&&pmHatQuelle(b))
                                   :PM_BETRIEBE.filter(b=>b.k===pmBetrieb&&pmHatQuelle(b));
   // Welche Standorte eine Quelle überhaupt mitbringt — aus den Daten gelesen,
   // nicht aus der Betriebsliste. Kommt in Werneck ein dritter Standort dazu,
@@ -3336,7 +3341,8 @@ function pmAgg(tage){
 function pmTrackerBereich(von,bis){
   const t=D.trackerTage||{};
   const im=a=>(a||[]).filter(x=>x.ds>=von&&x.ds<=bis);
-  const nimm=k=>pmBetrieb==='alle'||(k==='physio'&&pmBetrieb==='kphysio')||(k==='ergo'&&pmBetrieb==='kergo')||(k==='phfip'&&pmBetrieb==='phfip');
+  const nimm=k=>pmBetrieb==='alle'||(k==='physio'&&pmBetrieb==='kphysio')||(k==='ergo'&&pmBetrieb==='kergo')||(k==='phfip'&&pmBetrieb==='phfip')
+    ||(pmBetrieb==='_q:werneck'&&(k==='physio'||k==='ergo'))||(pmBetrieb==='_q:kitzingen'&&k==='phfip');
   const L=['physio','ergo','phfip'].filter(nimm).map(k=>({k,z:im(t[k])})).filter(x=>x.z.length);
   if(!L.length)return null;
   const alle=[].concat(...L.map(x=>x.z));
@@ -3402,6 +3408,19 @@ function pmZeitLeiste(B,Z,werktage,tage){
 // Im Verantwortlichen-Dashboard waehlt der Standortfilter oben den Betrieb,
 // eine zweite Leiste waere doppelt.
 function pmBetriebLeiste(){return '';}
+// Dieselben Zahlen je Haus. pmBetrieb wird dafür kurz umgestellt und sicher
+// zurückgesetzt — pmQ, pmAgg und der Tracker lesen ihn alle.
+function pmVergleich(B){
+  const merk=pmBetrieb,out=[];
+  try{
+    [['_q:werneck','Werneck'],['_q:kitzingen','Kitzingen']].forEach(([k,l])=>{
+      pmBetrieb=k;
+      const K=pmQ(),tage=(K.tage||[]).filter(t=>t&&t.ds>=B.von&&t.ds<=B.bis);
+      out.push({l,Z:pmAgg(tage),tr:pmTrackerBereich(B.von,B.bis)});
+    });
+  }finally{pmBetrieb=merk;}
+  return out;
+}
 function pmAusFilter(){
   if(aF==='KIMOJO Physio')return 'kphysio';
   if(aF==='KIMOJO Ergo')return 'kergo';
@@ -3472,6 +3491,11 @@ function rPraxis(){
   }
   const tr=pmTrackerBereich(B.von,B.bis);
   const einTag=B.von===B.bis;
+  // Bei „Alle": jede Kachel zusätzlich je Haus, Werneck gegen Kitzingen.
+  // Gerechnet mit denselben Funktionen, nur auf die Tage EINER Quelle.
+  const V=pmBetrieb==='alle'?pmVergleich(B):null;
+  const vgl=f=>V?'<div class="hk-vgl">'+V.map(x=>'<span>'+x.l+' <b>'+f(x)+'</b></span>').join('')+'</div>':'';
+  const p1=v=>v==null?'–':String(v).replace('.',',');
 
   // ── Die sechs. Alles andere ist Drill-down. ───────────────────────────────
   h+='<div class="hero" style="grid-template-columns:repeat(3,1fr)">';
@@ -3479,16 +3503,19 @@ function rPraxis(){
     +'<div class="hk-v">'+(Z.ausl==null?'–':Z.ausl+'%')+'</div>'
     +'<div class="hk-sub">'+pmStd(Z.sPg)+' am Patienten von '+pmStd(Z.sWm)+' Arbeitszeit'
     +(Z.auslB==null?'':' · <b>bereinigt '+Z.auslB+' %</b>')
-    +(Z.sRsv?' · '+pmStd(Z.sRsv)+' reserviert':'')+'</div></div>';
+    +(Z.sRsv?' · '+pmStd(Z.sRsv)+' reserviert':'')+'</div>'
+    +vgl(x=>x.Z.ausl==null?'–':x.Z.ausl+' %'+(x.Z.auslB==null?'':' <span style="font-weight:400">(ber. '+x.Z.auslB+' %)</span>'))+'</div>';
   h+='<div class="hk"><div class="hk-l">Offene Lücken</div>'
     +'<div class="hk-v">'+Z.luecken+'</div>'
     +'<div class="hk-sub">'+pmStd(Z.freiMin)+' frei · <b>'+Z.slots+' Termine = '+pmEuro(Z.slots)+'</b>'
     +(Z.kggFrei?' · '+Z.kggFrei+' KGG-Plätze fehlen ('+pmStd(Z.kggMin)+')':'')
-    +(einTag?'':' · ø '+Math.round(Z.luecken/Math.max(1,Z.locTage))+' je Tag')+'</div></div>';
+    +(einTag?'':' · ø '+Math.round(Z.luecken/Math.max(1,Z.locTage))+' je Tag')+'</div>'
+    +vgl(x=>x.Z.locTage?x.Z.luecken+' <span style="font-weight:400">('+pmEuro(x.Z.slots)+')</span>':'–')+'</div>';
   h+='<div class="hk"><div class="hk-l">Telefonannahmequote</div>'
     +'<div class="hk-v">'+(Z.quote==null?'–':Z.quote+'%')+'</div>'
     +'<div class="hk-sub">'+(Z.telTage?Z.tel.wsAn+' von '+Z.tel.ws+' in der Warteschlange · Ziel '+PM_ZIEL_QUOTE+' %'+zus
-      :'Für diesen Standort allein liegt keine Telefonie vor. Sie entsteht, sobald der Patientenchecker einmal geöffnet wurde.')+'</div></div>';
+      :'Für diesen Standort allein liegt keine Telefonie vor. Sie entsteht, sobald der Patientenchecker einmal geöffnet wurde.')+'</div>'
+    +vgl(x=>x.Z.quote==null?'–':p1(x.Z.quote)+' %')+'</div>';
   h+='<div class="hk"><div class="hk-l">Termine vereinbart</div>'
     +'<div class="hk-v">'+(tr&&tr.vereinbart!=null?tr.vereinbart:pmLeer)+'</div>'
     +'<div class="hk-sub">'+(tr?(tr.neu!=null?'davon '+tr.neu+' neu · ':'')+'an '+tr.tage+' Tag'+(tr.tage===1?'':'en')+' eingetragen'
@@ -3497,7 +3524,8 @@ function rPraxis(){
         +(tr.tage?'<br><b>ø '+String(Math.round(tr.vereinbart/tr.tage*10)/10).replace('.',',')+' je Tag</b>'
           +(tr.neu!=null&&tr.tageNeu?' · <b>ø '+String(Math.round(tr.neu/tr.tageNeu*10)/10).replace('.',',')+' neu je Tag</b>':''):'')
         +(tr.neuNurWerneck?' · neu nur Werneck (der Kitzinger Tracker führt keine Neuaufnahmen)':'')
-      :'aus dem Weekly KPI Tracker, von Hand geführt')+'</div></div>';
+      :'aus dem Weekly KPI Tracker, von Hand geführt')+'</div>'
+    +vgl(x=>x.tr&&x.tr.tage?x.tr.vereinbart+' <span style="font-weight:400">(ø '+p1(Math.round(x.tr.vereinbart/x.tr.tage*10)/10)+'/Tag)</span>':'–')+'</div>';
   // Offene Arbeit ist ein BESTAND, keine Menge, die sich über Tage addiert.
   // Dieselbe unerledigte Aufgabe zählte sonst an jedem Tag erneut. Über einen
   // Zeitraum steht deshalb der Durchschnitt: Wie viel lag typischerweise abends
@@ -3505,7 +3533,8 @@ function rPraxis(){
   h+='<div class="hk"><div class="hk-l">Offene Arbeit am Tagesende</div>'
     +'<div class="hk-v">'+(Z.restAvg==null?'–':Z.restAvg)+'</div>'
     +'<div class="hk-sub">'+(einTag?'offen und in Bearbeitung':'im Schnitt je Tag')
-    +(Z.ueberfAvg?' · <b style="color:var(--primary)">'+Z.ueberfAvg+' überfällig</b>':'')+zus+'</div></div>';
+    +(Z.ueberfAvg?' · <b style="color:var(--primary)">'+Z.ueberfAvg+' überfällig</b>':'')+zus+'</div>'
+    +vgl(x=>x.Z.restAvg==null?'–':x.Z.restAvg)+'</div>';
   // Bezugsgröße ist das TAGESPENSUM, nicht der Bestand am Abend. Sonst misst
   // die Quote das Gegenteil: Wer alle Lücken schließt, hätte gar keine
   // Bezugsgröße mehr, weil die Aufgaben mit ihrer Ursache verschwinden.
@@ -3514,7 +3543,8 @@ function rPraxis(){
     +'<div class="hk-sub">'+Z.erledigt+' von '+Z.pensum+' des Tagespensums'
     +(Z.entfallen?' · '+Z.entfallen+' durch Erledigen der Ursache':'')
     +(Z.unsicher?' · <b style="color:var(--primary)">Datenlage unvollständig</b>':'')
-    +zus+'</div></div>';
+    +zus+'</div>'
+    +vgl(x=>x.Z.aufQuote==null?'–':p1(x.Z.aufQuote)+' %')+'</div>';
   h+='</div>';
 
   // ── Auffälligkeiten. Die Zeile, die die Führungskraft liest. ─────────────

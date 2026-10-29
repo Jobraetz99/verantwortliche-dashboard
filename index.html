@@ -451,6 +451,16 @@ tbody tr:hover{background:var(--sunken)}
 @media(max-width:400px){#praxisBody .hero,#praxisBody #theraKpis{grid-template-columns:1fr!important}}
 #praxisBody table{border-spacing:0}
 #praxisBody .hk,#praxisBody .cd,#praxisBody .tc,#praxisBody .soon{border:1px solid var(--border)}
+.kpi-reihe{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:12px;margin-bottom:12px}
+.kpi-k{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.kpi-l{font-size:11.5px;color:var(--muted)}.kpi-v{font-size:26px;font-weight:650;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi-s{font-size:11.5px;color:var(--faint);margin-top:3px}
+.ausf-tab{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;margin-bottom:12px}
+.ausf-tab table{border-collapse:collapse;border-spacing:0;font-size:12.5px}.ausf-tab td,.ausf-tab th{padding:7px 12px;border-bottom:1px solid var(--hairline)}
+.ausf-tab th.r,.ausf-tab td.r{text-align:right;font-variant-numeric:tabular-nums}
+.ausf-tab tr.ausf-ueber td{background:var(--red-bg)}
+.ausf-kopf{font-size:13px;font-weight:600;margin:16px 0 8px}.ausf-kopf small{font-weight:400;color:var(--muted);margin-left:6px}
+.ausf-fuss{font-size:11.5px;color:var(--muted);margin:-2px 0 18px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -480,6 +490,7 @@ tbody tr:hover{background:var(--sunken)}
 <div class="tabsec act" id="tab-pm">
 <div class="seitenkopf"><h2>Praxismanager</h2><p>Hat das Praxismanagement dafür gesorgt, dass die Praxis organisatorisch sauber und wirtschaftlich gut gelaufen ist?</p></div>
 <div id="praxisBody"></div>
+<div id="ausfD"></div>
 <div class="st">OKR Praxismanagement</div><div class="okr-grid" id="okrP"></div>
 <div class="st">Auslastung <span class="sub">je Kalenderwoche</span></div>
 <div class="ausl-nav"><button class="nav-btn" onclick="chKW(-1)">←</button><h3 id="kwT"></h3><button class="nav-btn" onclick="chKW(1)">→</button><span id="kwI" style="font-size:12px;color:var(--muted)"></span></div>
@@ -755,6 +766,10 @@ async function loadAll(){
       return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/content`,{cache:'no-store',headers:{Authorization:'Bearer '+window._tk}})
         .then(r=>r.ok?r.text():null).then(t=>t?JSON.parse(t.replace(/^\uFEFF/,'')):null).catch(()=>null);};
     const WBASE='12_Code/Patientenchecker/Dateien Export/',CBASE='12_Code/Controlling/';
+    // Medifox-Rechnungen (Flow „Medifox Rechnungen“), eine Datei je Monat des
+    // laufenden Jahres — für die Ausfallrechnungen Kitzingen.
+    const mfReP=Promise.all(Array.from({length:new Date().getMonth()+1},(_,i)=>
+      jGet(CBASE+'Medifox Rechnungen/medifox-rechnungen-'+new Date().getFullYear()+'-'+String(i+1).padStart(2,'0')+'.json')));
     const W_DAYS=['heute','morgen','t2','t3','t4','t5','t6','t7','t8','t9','t10','t11','t12','t13'];
     // Mitarbeiter kommt aus dem Flow normalerweise als Liste, zeitweise als
     // Text ("[{\"Id\":…}]"). Hier einheitlich zur Liste machen.
@@ -888,6 +903,7 @@ async function loadAll(){
     const aKWs=[...D.auslK.map(d=>d.kw),...D.auslP.map(d=>d.kw)];sKW=Math.min(cKW()-1,aKWs.length?Math.max(...aKWs):cKW()-1);
     if(fb)D.fb=pFB(fb);
     D.bwaK=bwaK;D.bwaP=bwaP;
+    D.mfRe=await mfReP.catch(()=>[]);
     // Praxismanagement wie im Controlling: Kennzahlendateien des
     // Patientencheckers plus die Tageszeilen aus dem Weekly KPI Tracker.
     lt.textContent='Lade Praxismanagement...';
@@ -1017,7 +1033,73 @@ function getBWAMonths(){
   return allBwaMs;
 }
 
-function render(){rFlt();pmBetrieb=pmAusFilter();rPraxis();rOKR();rPM();rClub();rVW();rAusl();rFB();rTH();rQM();}
+// ═══════════════════════════════════════════════════════════════════════════
+// AUSFALLRECHNUNGEN KITZINGEN (Medifox-Rechnungen)
+// ═══════════════════════════════════════════════════════════════════════════
+// Werden die Ausfallrechnungen gestellt und bezahlt? Grundlage sind die Belege
+// mit Kostenträger „Ausfall" und Nummer „K-…" (K = Kitzingen, Filiale 4; ohne
+// K sind es die alten Werneck-Filialen). Gerechnet wie im Controlling:
+//   - je Belegnummer zählt der jüngste Stand (eine gemahnte Rechnung heißt
+//     „Rechnung M1" und wäre sonst doppelt), spätere Monatsdatei gewinnt
+//   - eine Rechnung ist ein Beleg „Rechnung…", der nicht storniert ist
+//   - offen = Saldo > 0; überfällig = offen und Zahlungsziel vorbei
+//   - Mahnbelege tragen nur die Gebühr und zählen nicht als Rechnung
+// Was die Belege NICHT sagen: zu welchem Termin sie gehören. Ob für JEDEN
+// ausgefallenen Termin eine Rechnung gestellt wurde, lässt sich deshalb nicht
+// Zeile für Zeile prüfen — dafür bräuchte der Flow die Termin- oder Patienten-Id
+// am Beleg. Die Liste „Ausfallrechnung stellen" steht im Patientenchecker.
+function ausfDaten(){
+  const nr=new Map();
+  (Array.isArray(D.mfRe)?D.mfRe:[]).forEach(f=>((f&&f.rechnungen)||[]).forEach(r=>{if(r&&r.Nr)nr.set(String(r.Nr),r);}));
+  const heute=new Date();heute.setHours(0,0,0,0);
+  const A=[...nr.values()].filter(r=>r.KostentraegerTyp==='Ausfall'&&String(r.Nr).startsWith('K-')
+    &&/^rechnung/i.test(String(r.Belegtyp||''))&&!r.Storniert);
+  const st=[...nr.values()].filter(r=>r.KostentraegerTyp==='Ausfall'&&String(r.Nr).startsWith('K-')&&/^storno/i.test(String(r.Belegtyp||'')));
+  return A.map(r=>{const zz=r.Zahlungsziel?new Date(String(r.Zahlungsziel).slice(0,10)+'T00:00:00'):null;
+    const saldo=+r.Saldo||0;
+    return{nr:String(r.Nr),ds:String(r.Belegdatum||'').slice(0,10),patient:String(r.Patient||''),brutto:+r.Brutto||0,saldo,
+      offen:saldo>0.005,ueber:saldo>0.005&&zz&&zz<heute,ziel:zz,mahn:r.Mahnstufe||null};})
+    .concat(st.map(r=>({nr:String(r.Nr),ds:String(r.Belegdatum||'').slice(0,10),storno:true,brutto:+r.Brutto||0})));
+}
+function rAusfall(){
+  const el=document.getElementById('ausfD');if(!el)return;
+  if(REG==='Werneck'||!(aF==='Alle'||aF==='PHFIP')){el.innerHTML='';return;}
+  if(!Array.isArray(D.mfRe)||!D.mfRe.some(Boolean)){
+    el.innerHTML='<div class="st">Ausfallrechnungen <span class="sub">Kitzingen · Medifox</span></div>'
+      +'<div class="reg-hint">Die Medifox-Rechnungen (12_Code/Controlling/Medifox Rechnungen) sind nicht lesbar — ohne sie keine Zahlen.</div>';return;}
+  const X=ausfDaten(),re=X.filter(x=>!x.storno),sto=X.filter(x=>x.storno);
+  const eur=v=>(Math.round(v*100)/100).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const sum=(a,k)=>a.reduce((t,x)=>t+(x[k]||0),0);
+  const off=re.filter(x=>x.offen),ueb=off.filter(x=>x.ueber),mahn=off.filter(x=>x.mahn);
+  const bez=re.filter(x=>!x.offen);
+  const kachel=(l,v,sub,c)=>'<div class="kpi-k"><div class="kpi-l">'+l+'</div><div class="kpi-v"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div><div class="kpi-s">'+sub+'</div></div>';
+  let h='<div class="st">Ausfallrechnungen <span class="sub">Kitzingen · '+new Date().getFullYear()+' · Medifox-Rechnungen</span></div>'
+    +'<div class="kpi-reihe">'
+    +kachel('Gestellt',re.length,eur(sum(re,'brutto')))
+    +kachel('Bezahlt',bez.length,eur(sum(bez,'brutto')),'var(--green)')
+    +kachel('Offen',off.length,eur(sum(off,'saldo')),off.length?'var(--red)':'')
+    +kachel('Überfällig',ueb.length,eur(sum(ueb,'saldo'))+(mahn.length?' · '+mahn.length+' gemahnt':''),ueb.length?'var(--red)':'')
+    +'</div>';
+  // je Monat
+  const M={};re.forEach(x=>{const k=x.ds.slice(0,7);const m=M[k]||(M[k]={n:0,b:0,o:0,on:0,s:0});m.n++;m.b+=x.brutto;if(x.offen){m.on++;m.o+=x.saldo;}});
+  sto.forEach(x=>{const k=x.ds.slice(0,7);(M[k]||(M[k]={n:0,b:0,o:0,on:0,s:0})).s++;});
+  const MNL=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  h+='<div class="ausf-tab"><table><thead><tr><th>Monat</th><th class="r">gestellt</th><th class="r">Betrag</th><th class="r">offen</th><th class="r">offen €</th><th class="r">Stornos</th></tr></thead><tbody>'
+    +Object.keys(M).sort().reverse().map(k=>{const m=M[k];return'<tr><td>'+MNL[+k.slice(5,7)-1]+' '+k.slice(0,4)+'</td><td class="r">'+m.n+'</td><td class="r">'+eur(m.b)
+      +'</td><td class="r">'+(m.on||'–')+'</td><td class="r"'+(m.on?' style="color:var(--red);font-weight:600"':'')+'>'+(m.on?eur(m.o):'–')+'</td><td class="r">'+(m.s||'–')+'</td></tr>';}).join('')
+    +'</tbody></table></div>';
+  if(off.length){
+    h+='<div class="ausf-kopf">Offene Ausfallrechnungen <small>'+off.length+' · älteste zuerst</small></div><div class="ausf-tab"><table><thead><tr><th>Beleg</th><th>Datum</th><th>Patient</th><th class="r">Betrag</th><th class="r">offen</th><th>Zahlungsziel</th><th>Mahnstufe</th></tr></thead><tbody>'
+      +off.slice().sort((a,b)=>a.ds<b.ds?-1:1).map(x=>'<tr'+(x.ueber?' class="ausf-ueber"':'')+'><td>'+esc(x.nr)+'</td><td>'+x.ds.split('-').reverse().join('.')+'</td><td>'+esc(x.patient)
+        +'</td><td class="r">'+eur(x.brutto)+'</td><td class="r"><b>'+eur(x.saldo)+'</b></td><td>'+(x.ziel?x.ziel.toLocaleDateString('de-DE')+(x.ueber?' · überfällig':''):'–')+'</td><td>'+(x.mahn||'–')+'</td></tr>').join('')
+      +'</tbody></table></div>';
+  }
+  h+='<div class="ausf-fuss">Ob für <b>jeden</b> ausgefallenen Termin eine Rechnung gestellt wurde, lässt sich hier nicht Zeile für Zeile prüfen: '
+    +'Die Belege nennen keinen Termin und keine Patienten-Id. Die Termine, für die eine Ausfallrechnung fällig ist, stehen im Patientenchecker Kitzingen unter Offene Rezepte → Ausfallrechnung.</div>';
+  el.innerHTML=h;
+}
+
+function render(){rFlt();pmBetrieb=pmAusFilter();rPraxis();rAusfall();rOKR();rPM();rClub();rVW();rAusl();rFB();rTH();rQM();}
 
 function rFlt(){
   const avail=new Set(D.raw.map(r=>r.mo).filter(Boolean).map(m=>MN[m-1]));

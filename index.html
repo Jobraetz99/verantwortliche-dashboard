@@ -1172,10 +1172,10 @@ function clOrt(k,titel,von,bis){
   const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['mitgl','Mitglieder'],['strich','Strichliste']];
   const a=CL.ansicht[k];
   const ortRe=k==='w'?/werneck|kimojo/i:/kitzingen|phfip/i;
-  let body=mgLeiste(ortRe);
+  let body='';
   if(a==='reise')body+=k==='w'?reAnsicht(['wp','we'],ortRe,von,bis):reKitzAnsicht(ortRe,von,bis);
   else if(a==='gespr')body+=mwGespraeche(von,bis,ortRe);
-  else if(a==='mitgl')body+=mgAnsicht(ortRe,von,bis);
+  else if(a==='mitgl')body+=mgLeiste(ortRe)+mgAnsicht(ortRe,von,bis);
   else body+=mwStrich(von,bis,ortRe);
   return '<div class="cr-ort"><div class="cl-card-h '+k+'"><span>🏋️ '+esc(titel)+'</span>'
     +'<div class="cr-tabs">'+reiter.map(([x,l])=>'<button class="'+(a===x?'a':'')
@@ -1302,7 +1302,7 @@ function mgDelta(d){
   if(d==null)return '';
   return d>0?'<span style="color:#1d7a4e;font-weight:600">+'+d+'</span>':d<0?'<span style="color:#c03b35;font-weight:600">'+d+'</span>':'<span class="re-leise">±0</span>';
 }
-// Die Leiste ueber jeder Ansicht: wie viele sind es jetzt. Je Art eine Karte
+// Die Leiste oben im Reiter Mitglieder: wie viele sind es jetzt. Je Art eine Karte
 // mit Koepfen, der Aufteilung einmal/zweimal pro Woche (nur wenn der
 // Gruppenname sie hergibt) und den Gruppen darunter.
 function mgName(n){return String(n||'').replace(/\s+/g,' ').replace(/\(\s+/g,'(').replace(/\s+\)/g,')').trim();}

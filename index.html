@@ -908,9 +908,12 @@ async function loadAll(){
     // Patientencheckers plus die Tageszeilen aus dem Weekly KPI Tracker.
     lt.textContent='Lade Praxismanagement...';
     try{D.pmKenn=await kennLade();}catch(e){console.warn('Kennzahlen:',e);}
-    const [tKP,tKE]=await Promise.all([gS(dr.k,FI.kpi,'KIMOJO KPI Physio').catch(()=>null),
-      gS(dr.k,FI.kpi,'KIMOJO KPI Ergo').then(r=>r||gS(dr.k,FI.kpi,'KIMOJO KPI E')).catch(()=>null)]);
-    D.trackerTage={physio:tKP?parseTrackerTage(tKP):[],ergo:tKE?parseTrackerTage(tKE):[]};
+    const [tKP,tKE,tPP]=await Promise.all([gS(dr.k,FI.kpi,'KIMOJO KPI Physio').catch(()=>null),
+      gS(dr.k,FI.kpi,'KIMOJO KPI Ergo').then(r=>r||gS(dr.k,FI.kpi,'KIMOJO KPI E')).catch(()=>null),
+      // Kitzingen: PHFIP Weekly KPI Tracker, Blatt „PhFiP KPI Physio" (Datum,
+      // Termine vereinbart — eine Spalte für Neuaufnahmen hat es nicht).
+      dr.p?gS(dr.p,FI.kpiP,'PhFiP KPI Physio').catch(()=>null):Promise.resolve(null)]);
+    D.trackerTage={physio:tKP?parseTrackerTage(tKP):[],ergo:tKE?parseTrackerTage(tKE):[],phfip:tPP?parseTrackerTage(tPP):[]};
     ld.classList.add('h');document.getElementById('db').style.display='block';render();
     pmTaktStart();
   }catch(e){lt.textContent='Fehler: '+e.message;console.error(e);}
@@ -3099,7 +3102,10 @@ function pmSetZeit(z){
 // Kalendertage durchzuklicken führte durch Wochenenden, an denen nichts steht.
 function pmTageMitDaten(){
   return(pmQ().tage||[])
-    .filter(t=>t&&t.loc&&t.auf&&Object.keys(t.loc).length).map(t=>t.ds);
+    // Ein Tag mit Standortzahlen genügt. Der Aufgabenstand fehlt an Tagen, an
+    // denen der Patientenchecker nicht offen war — die nachgerechneten Kitzinger
+    // Vortage haben ihn nie. Verlangte man ihn, ließe sich nicht zurückblättern.
+    .filter(t=>t&&t.loc&&Object.keys(t.loc).length).map(t=>t.ds);
 }
 // Von wann bis wann reicht die Datei überhaupt? Begrenzt das Blättern, damit
 // man nicht endlos in leere Monate hinauswandert.
@@ -3137,7 +3143,7 @@ function pmSetDatum(welches,v){
 // sie nicht, und dann ist der Freitag der richtige Bezugstag.
 function pmLetzterTag(){
   const tage=pmQ().tage||[];
-  const voll=tage.filter(t=>t&&t.loc&&t.auf&&Object.keys(t.loc).length);
+  const voll=tage.filter(t=>t&&t.loc&&Object.keys(t.loc).length);
   if(voll.length)return voll[voll.length-1].ds;
   // Noch kein vollständiger Tag: dann der letzte Tag mit überhaupt Daten.
   // Telefoniezahlen allein sind besser als eine leere Seite — sie kommen aus
@@ -3324,15 +3330,23 @@ function pmAgg(tage){
   return Z;
 }
 
+// Der Weekly KPI Tracker ist bisher nur für Werneck angebunden (Physio und
+// Ergo getrennt). Er folgt dem gewählten Betrieb: Ergo allein zeigt nur Ergo,
+// PhFiP zeigt nichts statt der Werneck-Zahlen.
 function pmTrackerBereich(von,bis){
   const t=D.trackerTage||{};
   const im=a=>(a||[]).filter(x=>x.ds>=von&&x.ds<=bis);
-  const p=im(t.physio),e=im(t.ergo);
-  if(!p.length&&!e.length)return null;
+  const nimm=k=>pmBetrieb==='alle'||(k==='physio'&&pmBetrieb==='kphysio')||(k==='ergo'&&pmBetrieb==='kergo')||(k==='phfip'&&pmBetrieb==='phfip');
+  const L=['physio','ergo','phfip'].filter(nimm).map(k=>({k,z:im(t[k])})).filter(x=>x.z.length);
+  if(!L.length)return null;
+  const alle=[].concat(...L.map(x=>x.z));
   const sum=(a,k)=>a.reduce((s,x)=>s+(x[k]==null?0:x[k]),0);
-  return{vereinbart:sum(p,'vereinbart')+sum(e,'vereinbart'),
-    neu:sum(p,'neu')+sum(e,'neu'),
-    tage:new Set(p.concat(e).map(x=>x.ds)).size};
+  // „neu" gibt es nur, wo der Tracker die Spalte hat (Werneck). Steht nirgends
+  // eine, bleibt es leer statt 0.
+  const mitNeu=alle.filter(x=>x.neu!=null);
+  return{vereinbart:sum(alle,'vereinbart'),neu:mitNeu.length?sum(mitNeu,'neu'):null,
+    neuNurWerneck:mitNeu.length>0&&L.some(x=>x.k==='phfip'),
+    tage:new Set(alle.map(x=>x.ds)).size,tageNeu:new Set(mitNeu.map(x=>x.ds)).size};
 }
 
 function pmZeitLeiste(B,Z,werktage,tage){
@@ -3478,6 +3492,11 @@ function rPraxis(){
   h+='<div class="hk"><div class="hk-l">Termine vereinbart</div>'
     +'<div class="hk-v">'+(tr&&tr.vereinbart!=null?tr.vereinbart:pmLeer)+'</div>'
     +'<div class="hk-sub">'+(tr?(tr.neu!=null?'davon '+tr.neu+' neu · ':'')+'an '+tr.tage+' Tag'+(tr.tage===1?'':'en')+' eingetragen'
+        // Durchschnitt je eingetragenem Tag — Tage ohne Eintrag zählen nicht
+        // als null, sie fehlen nur.
+        +(tr.tage?'<br><b>ø '+String(Math.round(tr.vereinbart/tr.tage*10)/10).replace('.',',')+' je Tag</b>'
+          +(tr.neu!=null&&tr.tageNeu?' · <b>ø '+String(Math.round(tr.neu/tr.tageNeu*10)/10).replace('.',',')+' neu je Tag</b>':''):'')
+        +(tr.neuNurWerneck?' · neu nur Werneck (der Kitzinger Tracker führt keine Neuaufnahmen)':'')
       :'aus dem Weekly KPI Tracker, von Hand geführt')+'</div></div>';
   // Offene Arbeit ist ein BESTAND, keine Menge, die sich über Tage addiert.
   // Dieselbe unerledigte Aufgabe zählte sonst an jedem Tag erneut. Über einen

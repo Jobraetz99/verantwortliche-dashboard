@@ -1949,7 +1949,17 @@ function reKeinRezept(beschreibung){
   if(/diagnostik/i.test(b)&&!/krankengymnastik|lymph|mld|therapie|massage|behandlung|traktion|elektro|packung/i.test(b))return true;
   return false;
 }
-function reKitzTage(beh,pl,heuteIso){
+// endeMap: "VerordnungId|Tag" → Ende des letzten Termins an dem Tag ("HH:MM").
+function reKitzEnden(listen){
+  const E={};
+  listen.forEach(a=>(Array.isArray(a)?a.flat(2):[]).forEach(x=>{
+    if(!x||x.VerordnungId==null||!x.Beginn||!x.Ende)return;
+    const b=parseZeit(x.Beginn),e=parseZeit(x.Ende);if(!b||!e)return;
+    const k=x.VerordnungId+'|'+bYMD(b);if(!E[k]||e>E[k])E[k]=e;}));
+  Object.keys(E).forEach(k=>{E[k]=bHM(E[k]);});
+  return E;
+}
+function reKitzTage(beh,pl,heuteIso,endeMap){
   const nm={};(pl||[]).forEach(p=>{if(p&&p.Id)nm[p.Id]=((p.Nachname||'')+', '+(p.Vorname||'')).trim();});
   const proTag={};
   (Array.isArray(beh)?beh:[]).forEach(p=>{
@@ -1961,11 +1971,12 @@ function reKitzTage(beh,pl,heuteIso){
     (d.Verordnungen||[]).forEach(v=>{
       if(!v||v.IsReadOnly||reKeinRezept(v.Beschreibung))return;
       const te=(v.Termine||[]).filter(x=>x&&x.Datum&&RE_MF_STATUS.has(x.Status))
-        .map(x=>({ds:String(x.Datum).slice(0,10),uz:String(x.Datum).length>10?bHM(parseZeit(x.Datum)):'',th:x.MitarbeiterName||''})).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0);
+        .map(x=>({ds:String(x.Datum).slice(0,10),th:x.MitarbeiterName||''})).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0);
       const tage=[...new Set(te.map(x=>x.ds))];if(!tage.length)return;
       const ende=tage[tage.length-1];
       const folge=spaeter.some(ds=>ds>ende)?1:0;
-      const ez=te.filter(x=>x.ds===ende&&x.uz).map(x=>x.uz).sort()[0]||'';
+      // Medifox nennt je Termin nur den Beginn; das Ende kommt aus dem Kalender.
+      const ez=(endeMap&&endeMap[String(v.Id)+'|'+ende])||'';
       const name=nm[pid]||'Unbekannt';
       const dazu=(ds,pos)=>{if(heuteIso&&ds>heuteIso)return;
         const th=(te.find(x=>x.ds===ds)||{}).th||'';
@@ -1983,10 +1994,16 @@ function reKitzLaden(){
   const jGet=path=>{const e=path.split('/').filter(x=>x).map(encodeURIComponent).join('/');
     return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/content`,{cache:'no-store',headers:{Authorization:'Bearer '+window._tk}})
       .then(r=>r.ok?r.text():null).then(t=>t?JSON.parse(t.replace(/^\uFEFF/,'')):null).catch(()=>null);};
-  Promise.all([jGet('12_Code/Controlling/behandlungen_alle.json'),jGet('12_Code/Controlling/patientenliste.json')])
-    .then(([beh,pl])=>{
+  // Enden der Termine: Wochenplan und 7-Tage-Plan (Zukunft), Termin-Archiv
+  // des Patientencheckers (vergangene Tage, dieser und voriger Monat).
+  const jetztP=tzParts(new Date()),arch=[0,1].map(i=>bYM(jetztP.y,jetztP.m-1-i));
+  Promise.all([jGet('12_Code/Controlling/behandlungen_alle.json'),jGet('12_Code/Controlling/patientenliste.json'),
+    Promise.all([jGet('12_Code/Controlling/terminplan_woche_f4.json'),jGet('12_Code/Controlling/terminplan_7tage_f4.json')]
+      .concat(arch.map(m=>jGet('12_Code/Patientenchecker/Dateien Export Kitzingen/archiv/termine_kz_'+m+'.json')
+        .then(j=>j&&j.tage?Object.values(j.tage):null))))])
+    .then(([beh,pl,kal])=>{
       if(!Array.isArray(beh)){MF.status='fehlt';}
-      else{MF.tage=reKitzTage(beh,pl,reIso(clNaechsterWerktag(clHeute())));MF.status='ok';MF.ohneNamen=!Array.isArray(pl);}
+      else{MF.tage=reKitzTage(beh,pl,reIso(clNaechsterWerktag(clHeute())),reKitzEnden(kal||[]));MF.status='ok';MF.ohneNamen=!Array.isArray(pl);}
       rClub();
     });
 }
@@ -2160,8 +2177,8 @@ function reAnsicht(locIds,ortRe,von,bis,jetzt,tageQuelle){
 
   // Die Namen. Oben, wer durchzurutschen droht.
   const dt=d=>d?d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}):'—';
-  // Letzter Termin mit Uhrzeit, sobald die Liste sie trägt (ab 30.10.2026).
-  const dtE=f=>dt(reTag(f.ende))+(f.endeZeit?', '+esc(f.endeZeit)+' Uhr':'');
+  // Letzter Termin mit seinem Ende, sobald die Liste es trägt (ab 30.10.2026).
+  const dtE=f=>dt(reTag(f.ende))+(f.endeZeit?', bis '+esc(f.endeZeit)+' Uhr':'');
   const ueber=imZr.filter(f=>f.status==='ueber').concat(rueck).sort((a,b)=>(a.ende||a.ab)<(b.ende||b.ab)?-1:1);
   if(ueber.length)h+='<div class="re-kopf" style="color:#c03b35">Überfällig — kein Gespräch '+RE_FRIST+' Werktage nach dem letzten Termin</div>'
     +'<table class="re-tab"><thead><tr><th>Patient</th><th>Therapeut</th><th>letzter Termin</th><th class="n">Werktage drüber</th><th></th></tr></thead><tbody>'

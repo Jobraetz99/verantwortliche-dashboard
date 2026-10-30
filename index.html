@@ -570,10 +570,13 @@ const TZB='Europe/Berlin';
     return orig.call(this,loc,Object.assign({},opt||{},{timeZone:TZB}));
   };
 });
+// Einmal anlegen: ein neues Intl.DateTimeFormat je Aufruf kostet ~50 µs, beim
+// Laden laufen Zehntausende Termine hier durch.
+const TZF=new Intl.DateTimeFormat('en-US',{timeZone:TZB,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',weekday:'short'});
 function tzParts(d){
   const dt=d instanceof Date?d:new Date(d);
   if(isNaN(+dt))return null;
-  const fmt=new Intl.DateTimeFormat('en-US',{timeZone:TZB,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',weekday:'short'});
+  const fmt=TZF;
   const o={};
   for(const p of fmt.formatToParts(dt)) if(p.type!=='literal') o[p.type]=p.value;
   let h=o.hour; if(h==='24') h='00';
@@ -592,6 +595,8 @@ function tzWall(y,m0,d,h,mi,s,ms){
   h=h||0;mi=mi||0;s=s||0;ms=ms||0;
   const utc=Date.UTC(y,m0,d,h,mi,s);
   const t1=utc-tzOffsetMs(utc),t2=utc-tzOffsetMs(t1);
+  // Umstellungen liegen nur zwischen 01 und 04 Uhr; sonst genügt t1.
+  if((h<1||h>3)&&t1===t2)return new Date(t1+ms);
   const hit=t=>{const p=tzParts(new Date(t));return p&&p.y===y&&p.m===m0+1&&p.d===d&&p.h===h&&p.mi===mi&&p.s===s;};
   const hits=[t1,t2,t1-36e5,t1+36e5,t2-36e5,t2+36e5].filter(hit);
   return new Date((hits.length?Math.min.apply(null,hits):t2)+ms);
@@ -615,7 +620,16 @@ function bJahr(d){return tzParts(d).y;}
 function bMonat(d){return tzParts(d).m;}
 // Naive Angaben (CSV, Praxis, Kennzahlen) sind Berliner Ortszeit. Ein
 // angehaengtes Z oder ±Offset bleibt ein absoluter Zeitpunkt.
+const PZ_CACHE=new Map();
 function parseZeit(v){
+  if(typeof v==='string'){
+    let t=PZ_CACHE.get(v);
+    if(t===undefined){const d=parseZeitRoh(v);t=d?+d:null;if(PZ_CACHE.size>200000)PZ_CACHE.clear();PZ_CACHE.set(v,t);}
+    return t===null?null:new Date(t);
+  }
+  return parseZeitRoh(v);
+}
+function parseZeitRoh(v){
   if(v instanceof Date)return isNaN(v)?null:v;
   if(typeof v==='number'&&v>1e11)return new Date(v);
   if(typeof v==='number'&&v>40000){

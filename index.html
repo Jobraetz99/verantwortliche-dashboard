@@ -463,6 +463,9 @@ tbody tr:hover{background:var(--sunken)}
 .ausf-fuss{font-size:11.5px;color:var(--muted);margin:-2px 0 18px;line-height:1.5}
 #praxisBody .hk-vgl{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:9px;border-top:1px solid var(--hairline);font-size:12px;color:var(--muted)}
 #praxisBody .hk-vgl b{color:var(--dark);font-weight:650;font-variant-numeric:tabular-nums}
+.ku-b{display:inline-block;min-width:46px;padding:1px 8px;border-radius:100px;font-size:11.5px;font-weight:650;text-align:center;background:#EFEFF1;color:var(--muted);font-variant-numeric:tabular-nums}
+.ku-b.g{background:var(--green-bg);color:var(--green)}.ku-b.y{background:var(--amber-bg);color:var(--amber)}.ku-b.r{background:var(--red-bg);color:var(--red)}
+.ku-raster td{text-align:center}
 </style>
 </head>
 <body>
@@ -912,6 +915,16 @@ async function loadAll(){
         const gruppen=gt.map(mgParse).filter(Boolean);
         const st=gd.map(d=>new Date(d.lastModifiedDateTime)).filter(t=>!isNaN(t)).sort((a,b)=>b-a)[0]||null;
         if(gruppen.length)MG.orte[q.ort]={gruppen,stand:st};
+      }
+      // Kurse (Club- und Präventions-Sessions) aus dem MyWellness-Kalender:
+      // je Woche eine Datei in <Standort>/Kurse/, so wie der Kalender sie
+      // liefert (calendar.mywellness.com/v2/pro/class/search).
+      for(const q of quellen){
+        const kd=(await kinder(q.pfad+'Kurse/')).filter(x=>x.file&&/\.json$/i.test(x.name));
+        if(!kd.length)continue;
+        const kt=await Promise.all(kd.map(d=>tGet(q.pfad+'Kurse/'+d.name)));
+        const st=kd.map(d=>new Date(d.lastModifiedDateTime)).filter(t=>!isNaN(t)).sort((a,b)=>b-a)[0]||null;
+        KU.orte[q.ort]={sessions:kuParse(kt),stand:st};
       }
       return mwNotizenAnhaengen(mwOhneDoppel(alle),notizen);
     })().catch(()=>[]);
@@ -1544,13 +1557,14 @@ function rClub(){
   el.innerHTML=h||'<div class="qm-empty">Für die aktuelle Auswahl gibt es keine Club-Daten.</div>';
 }
 function clOrt(k,titel,von,bis){
-  const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['mitgl','Mitglieder'],['strich','Strichliste']];
+  const reiter=[['reise','Rezeptende → Gespräch'],['gespr','Gespräche & Absprung'],['mitgl','Mitglieder'],['kurse','Gruppenauslastung'],['strich','Strichliste']];
   const a=CL.ansicht[k];
   const ortRe=k==='w'?/werneck|kimojo/i:/kitzingen|phfip/i;
   let body='';
   if(a==='reise')body+=k==='w'?reAnsicht(['wp','we'],ortRe,von,bis):reKitzAnsicht(ortRe,von,bis);
   else if(a==='gespr')body+=mwGespraeche(von,bis,ortRe);
   else if(a==='mitgl')body+=mgLeiste(ortRe)+mgAnsicht(ortRe,von,bis);
+  else if(a==='kurse')body+=kuAnsicht(ortRe,von,bis);
   else body+=mwStrich(von,bis,ortRe);
   return '<div class="cr-ort"><div class="cl-card-h '+k+'"><span>'+esc(titel)+'</span>'
     +'<div class="cr-tabs">'+reiter.map(([x,l])=>'<button class="'+(a===x?'a':'')
@@ -1651,6 +1665,82 @@ function mgParse(t){
 // Aktueller Stand je Club (beim Laden gefuellt) und Tagesstaende (bei Bedarf
 // nachgeladen, dann wird neu gezeichnet).
 const MG={orte:{},tage:{},monate:{}};
+// ═══════════════════════════════════════════════════════════════════════════
+// GRUPPENAUSLASTUNG (MyWellness-Kalender)
+// ═══════════════════════════════════════════════════════════════════════════
+// Club und Prävention buchen die Teilnehmer künftig selbst in MyWellness. Im
+// Praxiskalender steht dann nur der Block (zählt im Praxismanager als belegt);
+// wie gut eine Session läuft, steht hier. Je Session liefert MyWellness Plätze
+// (maxParticipants), Buchungen (numberOfParticipants), Warteliste
+// (waitingListCounter) und ob sie stattgefunden hat (hasBeenDone). Wer
+// tatsächlich erschienen ist, liefert dieser Abruf NICHT — „gebucht" ist die
+// Zahl, nicht „erschienen".
+// Umsatz: vorläufig 15 € je Teilnehmer und Session (Festlegung 29.10.2026).
+const KU={orte:{}};
+const KU_EUR_TN=15;
+function kuParse(texte){
+  const m=new Map();
+  (texte||[]).forEach(t=>{let o;try{o=JSON.parse(String(t||'').replace(/^\uFEFF/,''));}catch(e){return;}
+    const L=Array.isArray(o)?o:(o&&Array.isArray(o.data)?o.data:(o&&Array.isArray(o.sessions)?o.sessions:[]));
+    L.forEach(x=>{if(!x||!x.id||!x.startDate)return;
+      // Dieselbe Session kommt in zwei Wochendateien vor, wenn sich die
+      // Abrufe überlappen. Es gilt die mit dem jüngeren Stand (spätere Datei).
+      m.set(x.id+'|'+(x.partitionDate||String(x.startDate).slice(0,10)),{
+        id:x.id,name:String(x.name||'(ohne Namen)').trim(),start:String(x.startDate).slice(0,16),ende:String(x.endDate||'').slice(0,16),
+        trainer:String(x.assignedTo||'').trim(),raum:String(x.room||'').trim(),
+        plaetze:+x.maxParticipants||0,gebucht:+x.numberOfParticipants||0,warte:+x.waitingListCounter||0,
+        gelaufen:!!x.hasBeenDone,serie:!x.isSingleOccurrence});});});
+  return[...m.values()].sort((a,b)=>a.start<b.start?-1:1);
+}
+function kuMin(x){const a=parseZeit(x.start),b=parseZeit(x.ende);return !a||!b?60:Math.max(0,(b-a)/6e4);}
+function kuQ(g,p){return p>0?Math.round(g/p*100):null;}
+function kuBadge(q){if(q==null)return'<span class="ku-b">–</span>';return'<span class="ku-b '+(q>=80?'g':q>=50?'y':'r')+'">'+q+' %</span>';}
+function kuAnsicht(ortRe,von,bis){
+  const ort=Object.keys(KU.orte).find(o=>ortRe.test(o));
+  if(!ort)return'<div class="qm-empty">Noch keine Kursdaten aus MyWellness. Sie kommen, sobald der Flow den Bereich „Kurse“ schreibt (MyWellness/&lt;Club&gt;/Kurse/).</div>';
+  const iso=d=>bYMD(d);
+  const v=iso(von),b=iso(bis);
+  const S=KU.orte[ort].sessions.filter(x=>x.start.slice(0,10)>=v&&x.start.slice(0,10)<=b);
+  const stand=KU.orte[ort].stand;
+  const standTxt=stand?'Stand MyWellness '+stand.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+', '+stand.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr':'';
+  if(!S.length)return'<div class="qm-empty">In diesem Zeitraum gibt es keine Sessions in MyWellness.'+(standTxt?' '+standTxt+'.':'')+'</div>';
+  const eur=v=>Math.round(v).toLocaleString('de-DE')+' €';
+  const sum=(a,k)=>a.reduce((t,x)=>t+(x[k]||0),0);
+  const g=sum(S,'gebucht'),p=sum(S,'plaetze'),w=sum(S,'warte'),min=S.reduce((t,x)=>t+kuMin(x),0);
+  const ums=g*KU_EUR_TN,jeStd=min>0?ums/(min/60):0,zukunft=S.filter(x=>!x.gelaufen).length;
+  let h='<div class="re-kacheln">'
+    +'<div class="re-k"><b>'+S.length+'</b><span>Sessions'+(zukunft?' · davon '+zukunft+' noch offen':'')+'</span></div>'
+    +'<div class="re-k"><b>'+(kuQ(g,p)==null?'–':kuQ(g,p)+' %')+'</b><span>Auslastung · '+g+' von '+p+' Plätzen gebucht</span></div>'
+    +'<div class="re-k'+(p-g>0?'':' gut')+'"><b>'+Math.max(0,p-g)+'</b><span>Plätze frei'+(w?' · '+w+' auf Warteliste':'')+'</span></div>'
+    +'<div class="re-k"><b>'+eur(ums)+'</b><span>Umsatz ('+KU_EUR_TN+' € je Teilnehmer) · '+eur(jeStd)+' je Stunde</span></div>'
+    +'</div>';
+  // Je Session-Reihe: gleicher Name, Wochentag und Uhrzeit.
+  const WT=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const R={};
+  S.forEach(x=>{const wt=bWD(parseZeit(x.start)),k=x.name+'|'+wt+'|'+x.start.slice(11,16);
+    const r=R[k]||(R[k]={name:x.name,wt,uhr:x.start.slice(11,16),trainer:new Set(),n:0,g:0,p:0,w:0,min:0});
+    r.n++;r.g+=x.gebucht;r.p+=x.plaetze;r.w+=x.warte;r.min+=kuMin(x);if(x.trainer)r.trainer.add(x.trainer);});
+  const reihen=Object.values(R).map(r=>Object.assign(r,{q:kuQ(r.g,r.p),ums:r.g*KU_EUR_TN,jeStd:r.min>0?r.g*KU_EUR_TN/(r.min/60):0}))
+    .sort((a,b)=>(a.q==null?999:a.q)-(b.q==null?999:b.q));
+  h+='<div class="re-kopf">Je Session <small>schwächste zuerst · gleiche Session = gleicher Name, Wochentag und Uhrzeit</small></div>'
+    +'<div class="cl-tw"><table><thead><tr><th>Session</th><th>Tag</th><th>Uhrzeit</th><th>Trainer</th><th>Termine</th><th>ø gebucht</th><th>Plätze</th><th>Auslastung</th><th>Warteliste</th><th>Umsatz</th><th>€ je Std.</th></tr></thead><tbody>'
+    +reihen.map(r=>'<tr><td style="text-align:left">'+esc(r.name)+'</td><td>'+WT[r.wt]+'</td><td>'+r.uhr+'</td><td style="text-align:left">'+esc([...r.trainer].join(', '))+'</td><td>'+r.n
+      +'</td><td>'+String(Math.round(r.g/r.n*10)/10).replace('.',',')+'</td><td>'+Math.round(r.p/r.n)+'</td><td>'+kuBadge(r.q)+'</td><td>'+(r.w||'–')+'</td><td>'+eur(r.ums)+'</td><td>'+eur(r.jeStd)+'</td></tr>').join('')
+    +'</tbody></table></div>';
+  // Raster Wochentag × Stunde: ø Auslastung.
+  const Z={};const stunden=new Set();
+  S.forEach(x=>{const hh=+x.start.slice(11,13),k=bWD(parseZeit(x.start))+'|'+hh;stunden.add(hh);
+    const z=Z[k]||(Z[k]={g:0,p:0});z.g+=x.gebucht;z.p+=x.plaetze;});
+  const tage=[1,2,3,4,5,6,0].filter(t=>S.some(x=>bWD(parseZeit(x.start))===t));
+  const hs=[...stunden].sort((a,b)=>a-b);
+  h+='<div class="re-kopf">Wann es voll ist <small>ø Auslastung je Wochentag und Stunde</small></div>'
+    +'<div class="cl-tw"><table class="ku-raster"><thead><tr><th>Uhrzeit</th>'+tage.map(t=>'<th>'+WT[t]+'</th>').join('')+'</tr></thead><tbody>'
+    +hs.map(hh=>'<tr><td>'+String(hh).padStart(2,'0')+':00</td>'+tage.map(t=>{const z=Z[t+'|'+hh];return'<td>'+(z?kuBadge(kuQ(z.g,z.p)):'')+'</td>';}).join('')+'</tr>').join('')
+    +'</tbody></table></div>';
+  h+='<div class="mg-fuss" style="margin-top:8px">'+(standTxt?standTxt+' · ':'')+'„gebucht“ ist der Buchungsstand in MyWellness; wer erschienen ist, liefert der Kalender nicht. '
+    +'Sessions in der Zukunft zählen mit ihrem aktuellen Buchungsstand. Umsatz vorläufig mit '+KU_EUR_TN+' € je Teilnehmer.</div>';
+  return h;
+}
 function mgGraph(path,kinder){
   const e=path.split('/').filter(s=>s).map(encodeURIComponent).join('/');
   return fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${e}:/`+(kinder?'children?$top=999':'content'),
@@ -2086,7 +2176,7 @@ function reAnsicht(locIds,ortRe,von,bis,jetzt,tageQuelle){
         +'">nachgetragen nach Frist (+'+f.spaet+' Werktag'+(f.spaet===1?'':'e')+')</span>':'')+(f.mehrdeutig?' <span class="re-leise" title="Mehrere Personen dieses Namens in MyWellness">⚠ Name mehrdeutig</span>':'')
       +'</td><td>'+esc(f.th||'—')+'</td><td class="re-weg">'+f.schritte.map(r=>{const a=mwArt(r.erg);
         return '<span class="mw-pkt" style="background:'+MW_ART[a].f+'"></span>'+(r.stufe?r.stufe+'. ':'')+esc(reErgLabel(r.erg))
-          +' <span class="re-leise">'+r.dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>'
+          +' <span class="re-leise">'+mwTagZeit(r.dt)+'</span>'
           +(r.notiz?'<div class="re-notiz">„'+esc(r.notiz)+'“</div>':'');}).join(' <span class="mw-pfeil">→</span> ')
       +'</td></tr>').join('')+'</tbody></table>';
   if(kommen.length)h+='<div class="re-kopf">Kommen noch zum letzten Termin <small>'+kommen.length
@@ -2230,7 +2320,7 @@ function mwGespraeche(von,bis,ortRe){
   // weiss niemand, was los ist.
   const so=R.filter(r=>r.erg==='sonst').sort((a,b)=>b.dt-a.dt);
   if(so.length)h+='<div class="mw-kopf" style="margin-top:16px"><b>„Sonstige“ — Anmerkungen</b> <small>'+so.length+' im Zeitraum</small></div>'
-    +'<table class="re-tab"><tbody>'+so.map(r=>'<tr><td style="white-space:nowrap">'+r.dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})
+    +'<table class="re-tab"><tbody>'+so.map(r=>'<tr><td style="white-space:nowrap">'+mwTagZeit(r.dt)
       +'</td><td style="white-space:nowrap">'+esc(r.name)+'<div class="re-leise">'+(r.stufe?r.stufe+'. Gespräch':'')+'</div></td><td>'
       +(r.notiz?'„'+esc(r.notiz)+'“':r.notiz===''?'<span class="re-leise">keine Anmerkung eingetragen</span>'
         :'<span class="re-leise">Anmerkung noch nicht abgerufen</span>')+'</td></tr>').join('')+'</tbody></table>';
@@ -2361,6 +2451,8 @@ function mwStufe(name){
   return m?+m[1]:null;
 }
 // "19.10.26 11:38" oder "22.10.2026 11:49:58" — Tag zuerst, Berliner Ortszeit.
+// "19.10., 11:38 Uhr". Ohne Uhrzeit in der Quelle (00:00) nur das Datum.
+function mwTagZeit(d){const hm=bHM(d);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+(hm==='00:00'?'':', '+hm+' Uhr');}
 function mwDatum(s){
   const m=String(s||'').trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if(!m)return null;

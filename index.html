@@ -1872,13 +1872,13 @@ function reFaelle(tage,locIds){
       a.forEach(x=>{
         if(!x||!x.n)return;
         const k=x.id&&x.v?x.id+'|'+x.v:'n|'+reNorm(x.n);
-        const f=F[k]||(F[k]={k,name:x.n,id:x.id||'',loc:lid,tage:[],vTage:[],th:'',folge:0,ende:'',endeZeit:''});
+        const f=F[k]||(F[k]={k,name:x.n,id:x.id||'',loc:lid,tage:[],vTage:[],th:'',folge:0,ende:'',endeZeit:'',endeBeginn:''});
         if(!f.tage.includes(t.ds))f.tage.push(t.ds);
         if(x.th&&x.th!=='—')f.th=x.th;
         f.folge=x.f?1:0;
         // Der tatsaechlich beobachtete letzte Termin schlaegt den geplanten.
-        if(x.p==='l'){f.ende=t.ds;f.lGesehen=1;if(x.ez)f.endeZeit=x.ez;}
-        else{if(x.e&&!f.lGesehen){f.ende=x.e;f.endeZeit=x.ez||'';}if(!f.vTage.includes(t.ds))f.vTage.push(t.ds);}
+        if(x.p==='l'){f.ende=t.ds;f.lGesehen=1;if(x.ez||x.eb){f.endeZeit=x.ez||'';f.endeBeginn=x.eb||'';}}
+        else{if(x.e&&!f.lGesehen){f.ende=x.e;f.endeZeit=x.ez||'';f.endeBeginn=x.eb||'';}if(!f.vTage.includes(t.ds))f.vTage.push(t.ds);}
       });
     });
   });
@@ -1971,16 +1971,17 @@ function reKitzTage(beh,pl,heuteIso,endeMap){
     (d.Verordnungen||[]).forEach(v=>{
       if(!v||v.IsReadOnly||reKeinRezept(v.Beschreibung))return;
       const te=(v.Termine||[]).filter(x=>x&&x.Datum&&RE_MF_STATUS.has(x.Status))
-        .map(x=>({ds:String(x.Datum).slice(0,10),th:x.MitarbeiterName||''})).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0);
+        .map(x=>({ds:String(x.Datum).slice(0,10),uz:String(x.Datum).length>10?bHM(parseZeit(x.Datum)):'',th:x.MitarbeiterName||''})).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0);
       const tage=[...new Set(te.map(x=>x.ds))];if(!tage.length)return;
       const ende=tage[tage.length-1];
       const folge=spaeter.some(ds=>ds>ende)?1:0;
       // Medifox nennt je Termin nur den Beginn; das Ende kommt aus dem Kalender.
       const ez=(endeMap&&endeMap[String(v.Id)+'|'+ende])||'';
+      const eb=ez?'':(te.filter(x=>x.ds===ende&&x.uz).map(x=>x.uz).sort()[0]||'');
       const name=nm[pid]||'Unbekannt';
       const dazu=(ds,pos)=>{if(heuteIso&&ds>heuteIso)return;
         const th=(te.find(x=>x.ds===ds)||{}).th||'';
-        (proTag[ds]=proTag[ds]||[]).push({n:name,p:pos,f:folge,id:String(pid),v:String(v.Id||''),th,e:ende,ez});};
+        (proTag[ds]=proTag[ds]||[]).push({n:name,p:pos,f:folge,id:String(pid),v:String(v.Id||''),th,e:ende,ez,eb});};
       dazu(ende,'l');if(tage.length>1)dazu(tage[tage.length-2],'v');
     });
   });
@@ -2178,7 +2179,9 @@ function reAnsicht(locIds,ortRe,von,bis,jetzt,tageQuelle){
   // Die Namen. Oben, wer durchzurutschen droht.
   const dt=d=>d?d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}):'—';
   // Letzter Termin mit seinem Ende, sobald die Liste es trägt (ab 30.10.2026).
-  const dtE=f=>dt(reTag(f.ende))+(f.endeZeit?', bis '+esc(f.endeZeit)+' Uhr':'');
+  // Ohne bekanntes Ende der Beginn, ausdrücklich so beschriftet.
+  const dtE=f=>dt(reTag(f.ende))+(f.endeZeit?', bis '+esc(f.endeZeit)+' Uhr'
+    :f.endeBeginn?', '+esc(f.endeBeginn)+' Uhr <span class="re-leise" title="Das Ende steht noch nicht im Kalender">(Beginn)</span>':'');
   const ueber=imZr.filter(f=>f.status==='ueber').concat(rueck).sort((a,b)=>(a.ende||a.ab)<(b.ende||b.ab)?-1:1);
   if(ueber.length)h+='<div class="re-kopf" style="color:#c03b35">Überfällig — kein Gespräch '+RE_FRIST+' Werktage nach dem letzten Termin</div>'
     +'<table class="re-tab"><thead><tr><th>Patient</th><th>Therapeut</th><th>letzter Termin</th><th class="n">Werktage drüber</th><th></th></tr></thead><tbody>'

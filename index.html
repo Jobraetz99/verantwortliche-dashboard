@@ -2987,7 +2987,7 @@ function rQMAn(){
       const items=[...r.list].sort((a,b)=>new Date(b.datum)-new Date(a.datum)).map(k=>{
         const st=qmStufe(k.prozent);
         const dets=Object.values(k.antworten||{}).filter(a=>a.pts<2).map(a=>esc(a.frage.split('?')[0])+': '+esc(a.label)).join(' · ');
-        return`<div class="dr"><span>${QM_KRIT[k.typ].icon} ${k.typ==='befund'?'Befund':'Doku'} · KW ${k.kw}/${k.jahr} · ${esc(k.patient)}</span><span style="font-weight:700;color:${st.c}">${k.punkte}/${k.maxPunkte} · ${k.prozent}%</span>${dets?`<span style="width:100%;color:var(--muted);font-size:11px">Abzüge: ${dets}</span>`:''}${k.anmerkung?`<span style="width:100%;font-style:italic;color:var(--muted);font-size:11px">„${esc(k.anmerkung)}" – ${esc(k.pruefer)}</span>`:''}</div>`;
+        return`<div class="dr"><span>${QM_KRIT[k.typ].icon} ${k.typ==='befund'?'Befund':'Doku'} · KW ${k.kw}/${k.jahr} · ${esc(k.patient)}</span><span style="font-weight:700;color:${st.c}">${k.punkte}/${k.maxPunkte} · ${k.prozent}%</span><span style="width:100%;color:var(--muted);font-size:11px">ausgefüllt von <b style="color:var(--dark);font-weight:600">${esc(k.pruefer||k.leitung||'unbekannt')}</b>${k.datum?' am '+new Date(k.datum).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+', '+new Date(k.datum).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr':''}</span>${dets?`<span style="width:100%;color:var(--muted);font-size:11px">Abzüge: ${dets}</span>`:''}${k.anmerkung?`<span style="width:100%;font-style:italic;color:var(--muted);font-size:11px">„${esc(k.anmerkung)}" – ${esc(k.pruefer)}</span>`:''}</div>`;
       }).join('');
       det=`<tr><td colspan="7" style="white-space:normal"><div class="qm-detail">${items}</div></td></tr>`;
     }

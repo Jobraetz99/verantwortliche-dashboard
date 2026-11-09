@@ -1589,7 +1589,9 @@ function clOrt(k,titel,von,bis){
 const MG_VERLAUF_AB='2026-10-28';
 const MG_ART=[
   {k:'club',   l:'Club-Mitglieder',   re:/smart|starter/i},
-  {k:'praev',  l:'Präventionskurse',  re:/pr[aä]vention/i},
+  // „Präv 8W 1x - (1. Kurs)", „Präv 8W 2x" und Co. sind ebenfalls Präventions-
+  // kurse — der Name ist dort abgekürzt (09.11.2026). Deshalb reicht „Präv".
+  {k:'praev',  l:'Präventionskurse',  re:/pr[aä]v/i},
   {k:'weitere',l:'Weitere Gruppen',   re:/./}
 ];
 // Praevention zuerst, nicht ueber die Reihenfolge in MG_ART: ein

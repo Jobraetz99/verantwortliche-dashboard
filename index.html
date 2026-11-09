@@ -867,7 +867,8 @@ async function loadAll(){
       .then(a=>maListe(a.filter(Array.isArray).reduce((x,y)=>x.concat(y),[])));
     const wpTpP=wTpP('_wp'),weTpP=wTpP('_we');
     const unwrapH=h=>{const d=h&&h.data&&h.data.termine;return Array.isArray(d)?d:(d&&Array.isArray(d.nodes)?d.nodes:[]);};
-    const unwrapV=v=>{const n=v&&v.data&&v.data.verordnungUebersicht&&v.data.verordnungUebersicht.nodes;return Array.isArray(n)?n:(Array.isArray(v)?v:[]);};
+    const unwrapV=v=>{const d=v&&v.data,u=d&&((d.verordnungUebersichtKontext&&d.verordnungUebersichtKontext.verordnungUebersicht)||d.verordnungUebersicht);const n=u&&u.nodes; // thevea ab 26.11: …Kontext.verordnungUebersicht
+     return Array.isArray(n)?n:(Array.isArray(v)?v:[]);};
     const wpHiP=jGet(WBASE+'termine_historie_wp.json'),weHiP=jGet(WBASE+'termine_historie_we.json');
     const wpVoP=jGet(WBASE+'Verordnungsuebersicht.json'),weVoP=jGet(WBASE+'vo_uebersicht_we.json');
     const f4P=jGet(CBASE+'terminplan_woche_f4.json');

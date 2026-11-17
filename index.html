@@ -3098,6 +3098,34 @@ function pmTelFuer(qk,t){
   if(!qu||!qu.telOrt)return t.tel||null;
   return (t.telOrt&&t.telOrt[qu.telOrt])||null;
 }
+// Die Telefonie kommt aus EINEM Webex-Export, den jeder Patientenchecker beim
+// Öffnen in seine eigene Datei schreibt. Wird der Kitzinger Checker eine Woche
+// nicht geöffnet, steht in seiner Datei für Kitzingen höchstens der halbe Tag,
+// an dem er zuletzt lief — der Werneck-Checker hat die ganze Woche für beide
+// Standorte. Darum wird die Telefonie eines Tages aus der Datei genommen, die
+// diesen Tag zuletzt geschrieben hat (größtes ts), egal von welcher Quelle.
+// (Vorher: Kitzingen KW 46 zeigte nur 1 Anruf vom Morgen des 09.11.)
+function pmTelIndex(q){
+  const best={};
+  Object.keys(q||{}).forEach(qk=>((q[qk]||{}).tage||[]).forEach(t=>{
+    if(!t||!(t.telOrt||t.tel))return;
+    const b=best[t.ds];
+    if(!b||(t.ts||0)>(b.ts||0))best[t.ds]=t;
+  }));
+  return best;
+}
+// Telefonie eines Tages für eine Auswahl von Quellen: ein Standort → dessen
+// Zahl; mehrere Webex-Standorte → die Gesamtzahl derselben Datei (sie ist die
+// Summe beider und trägt eine echte Problemstunde, statt eine zu erfinden).
+function pmTelTag(idx,ds,qks){
+  const orte=[];
+  qks.forEach(qk=>{const qu=PM_QUELLEN.find(x=>x.q===qk);
+    if(qu&&qu.telOrt&&orte.indexOf(qu.telOrt)<0)orte.push(qu.telOrt);});
+  const t=idx[ds];
+  if(!orte.length||!t)return null;
+  if(orte.length===1)return (t.telOrt&&t.telOrt[orte[0]])||null;
+  return t.tel||null;
+}
 const PM_BETRIEBE=[
   {k:'alle',     l:'Alle',           q:null,      locs:null},
   {k:'kphysio',  l:'KIMOJO Physio',  q:'werneck', locs:['wp']},
@@ -3144,7 +3172,6 @@ function pmQ(){
       const z=proTag[t.ds]||(proTag[t.ds]={ds:t.ds,ts:0});
       z.ts=Math.max(z.ts||0,t.ts||0);
       if(erste){
-        const tel=pmTelFuer(b.q,t);if(tel&&!z.tel)z.tel=tel;
         if(t.rez&&!z.rez)z.rez=t.rez;
         if(t.auf&&!z.auf)z.auf=t.auf;
       }
@@ -3156,6 +3183,15 @@ function pmQ(){
         z.loc[mehr?b.k+'/'+k:k]=t.loc[k];
       });
     });
+  });
+  // Telefonie je Tag aus der jüngsten Datei (siehe pmTelIndex). Auch Tage,
+  // die nur in einer fremden Datei stehen (Kitzinger Checker nicht geöffnet),
+  // bekommen so ihre Telefonie.
+  const telIdx=pmTelIndex(q),telQ=Object.keys(gesehen);
+  Object.keys(telIdx).forEach(ds=>{
+    const tel=pmTelTag(telIdx,ds,telQ);if(!tel)return;
+    const z=proTag[ds]||(proTag[ds]={ds,ts:0});
+    z.tel=tel;
   });
   // Zeigt die Ansicht weniger Standorte, als die Quelle hat, dann beschreiben
   // Telefonie, Rezepte und Aufgaben mehr als das, was oben steht. Das muss

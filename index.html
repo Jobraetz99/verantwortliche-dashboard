@@ -3715,7 +3715,10 @@ function pmZeitLeiste(B,Z,werktage,tage){
   // 16 Uhr der Letzte den Browser, friert der Tag auf 16 Uhr ein — die Zahlen
   // sind dann richtig, aber nicht der Tagesabschluss. Ohne diese Angabe wäre
   // das nicht zu erkennen.
-  const einTagStand=(B.von===B.bis&&tage.length&&tage[0].ts)
+  // Nur für einen Tag MIT Standortzahlen: Ein Tag, für den nur Telefonie da
+  // ist, trägt den Zeitpunkt, an dem irgendein Checker die Webex-Zahlen des
+  // Monats neu geschrieben hat — das ist kein Tagesstand.
+  const einTagStand=(B.von===B.bis&&tage.length&&tage[0].ts&&tage[0].loc&&Object.keys(tage[0].loc).length)
     ?new Date(tage[0].ts).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
   h+='<div class="flt" style="margin-top:-10px">'
     +'<span class="hdr-badge">'+B.label+'</span>'
@@ -3726,7 +3729,14 @@ function pmZeitLeiste(B,Z,werktage,tage){
       +new Date(pmQ().stand).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
       +'</span>':'')
     +'</div>';
-  if(fehlt>0)h+='<div class="cd" style="margin-bottom:16px;font-size:12.5px;color:var(--muted);line-height:1.7">'
+  if(fehlt>0&&!Z.locTage)h+='<div class="cd" style="margin-bottom:16px;font-size:12.5px;color:var(--muted);line-height:1.7">'
+    +'Für '+(werktage===1?'diesen Tag':'keinen der '+werktage+' Werktage')+' liegen <b style="color:var(--dark)">keine Standort- und '
+    +'Aufgabenzahlen</b> vor — der Patientenchecker des Standorts war '+(werktage===1?'an dem Tag':'in dem Zeitraum')+' nicht geöffnet, '
+    +'und nachträglich lassen sie sich nicht erzeugen. Auslastung, Lücken und Aufgaben sind deshalb '
+    +'<b style="color:var(--dark)">nicht bewertbar</b> (nicht null). Vorhanden sind nur die Telefonie aus dem Webex-Export '
+    +'und die Termine aus dem Weekly KPI Tracker.'
+    +'</div>';
+  else if(fehlt>0)h+='<div class="cd" style="margin-bottom:16px;font-size:12.5px;color:var(--muted);line-height:1.7">'
     +'An <b style="color:var(--dark)">'+fehlt+'</b> Werktag'+(fehlt===1?'':'en')+' des Zeitraums liegen keine '
     +'Standort- und Aufgabenzahlen vor. Die entstehen nur, während der Patientenchecker des Standorts '
     +'geöffnet ist — an einem solchen Tag wurde es nicht geöffnet. Die Zahlen unten beziehen sich '
@@ -3835,15 +3845,15 @@ function rPraxis(){
   h+='<div class="hero" style="grid-template-columns:repeat(3,1fr)">';
   h+='<div class="hk"><div class="hk-l">Auslastung</div>'
     +'<div class="hk-v">'+(Z.ausl==null?'–':Z.ausl+'%')+'</div>'
-    +'<div class="hk-sub">'+pmStd(Z.sPg)+' am Patienten von '+pmStd(Z.sWm)+' Arbeitszeit'
+    +'<div class="hk-sub">'+(!Z.locTage?'keine Standortzahlen für diesen Zeitraum':pmStd(Z.sPg)+' am Patienten von '+pmStd(Z.sWm)+' Arbeitszeit')
     +(Z.auslB==null?'':' · <b>bereinigt '+Z.auslB+' %</b>')
     +(Z.sRsv?' · '+pmStd(Z.sRsv)+' reserviert':'')+'</div>'
     +vgl(x=>x.Z.ausl==null?'–':x.Z.ausl+' %'+(x.Z.auslB==null?'':' <span style="font-weight:400">(ber. '+x.Z.auslB+' %)</span>'))+'</div>';
   h+='<div class="hk"><div class="hk-l">Offene Lücken</div>'
-    +'<div class="hk-v">'+Z.luecken+'</div>'
-    +'<div class="hk-sub">'+pmStd(Z.freiMin)+' frei · <b>'+Z.slots+' Termine = '+pmEuro(Z.slots)+'</b>'
+    +'<div class="hk-v">'+(Z.locTage?Z.luecken:'–')+'</div>'
+    +'<div class="hk-sub">'+(!Z.locTage?'keine Standortzahlen für diesen Zeitraum':pmStd(Z.freiMin)+' frei · <b>'+Z.slots+' Termine = '+pmEuro(Z.slots)+'</b>'
     +(Z.kggFrei?' · '+Z.kggFrei+' KGG-Plätze fehlen ('+pmStd(Z.kggMin)+')':'')
-    +(einTag?'':' · ø '+Math.round(Z.luecken/Math.max(1,Z.locTage))+' je Tag')+'</div>'
+    +(einTag?'':' · ø '+Math.round(Z.luecken/Math.max(1,Z.locTage))+' je Tag'))+'</div>'
     +vgl(x=>x.Z.locTage?x.Z.luecken+' <span style="font-weight:400">('+pmEuro(x.Z.slots)+')</span>':'–')+'</div>';
   h+='<div class="hk"><div class="hk-l">Telefonannahmequote</div>'
     +'<div class="hk-v">'+(Z.quote==null?'–':Z.quote+'%')+'</div>'
@@ -3866,7 +3876,7 @@ function rPraxis(){
   // noch da?
   h+='<div class="hk"><div class="hk-l">Offene Arbeit am Tagesende</div>'
     +'<div class="hk-v">'+(Z.restAvg==null?'–':Z.restAvg)+'</div>'
-    +'<div class="hk-sub">'+(einTag?'offen und in Bearbeitung':'im Schnitt je Tag')
+    +'<div class="hk-sub">'+(Z.restAvg==null?'keine Aufgabenzahlen für diesen Zeitraum':einTag?'offen und in Bearbeitung':'im Schnitt je Tag')
     +(Z.ueberfAvg?' · <b style="color:var(--primary)">'+Z.ueberfAvg+' überfällig</b>':'')+zus+'</div>'
     +vgl(x=>x.Z.restAvg==null?'–':x.Z.restAvg)+'</div>';
   // Bezugsgröße ist das TAGESPENSUM, nicht der Bestand am Abend. Sonst misst
@@ -3874,7 +3884,7 @@ function rPraxis(){
   // Bezugsgröße mehr, weil die Aufgaben mit ihrer Ursache verschwinden.
   h+='<div class="hk"><div class="hk-l">Aufgaben erledigt</div>'
     +'<div class="hk-v">'+(Z.aufQuote==null?'–':Z.aufQuote+'%')+'</div>'
-    +'<div class="hk-sub">'+Z.erledigt+' von '+Z.pensum+' des Tagespensums'
+    +'<div class="hk-sub">'+(Z.aufQuote==null&&!Z.pensum?'keine Aufgabenzahlen für diesen Zeitraum':Z.erledigt+' von '+Z.pensum+' des Tagespensums')
     +(Z.entfallen?' · '+Z.entfallen+' durch Erledigen der Ursache':'')
     +(Z.unsicher?' · <b style="color:var(--primary)">Datenlage unvollständig</b>':'')
     +zus+'</div>'
@@ -3929,6 +3939,8 @@ function rPraxis(){
     +'„Termine vereinbart" steht in keinem System; ohne Eingabe gibt es die Zahl nicht.');
   else if(tr.tage<Z.locTage)auf_.push('Im Weekly KPI Tracker sind nur <b>'+tr.tage+'</b> von '
     +Z.locTage+' Tagen eingetragen — die Terminzahl oben ist entsprechend unvollständig.');
+  if(!Z.locTage&&werktage)auf_.push('Auslastung, Lücken und Aufgaben konnten <b>nicht geprüft</b> werden — '
+    +'für '+(werktage===1?'diesen Tag':'diesen Zeitraum')+' fehlen die Standortzahlen (Patientenchecker nicht geöffnet).');
   h+='<div class="st" style="cursor:default">🔎 Auffälligkeiten</div><div class="cd">';
   if(!auf_.length)h+='<div style="font-size:13.5px;color:var(--green);font-weight:600">'
     +'Keine Auffälligkeit — der Zeitraum lief nach Standard.</div>';

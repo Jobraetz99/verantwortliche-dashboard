@@ -1470,7 +1470,14 @@ async function qmSave(){
   const mine=QM.data.kontrollen;
   try{
     const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${dr.k}/root:/${QM_FILE}:/content`,{headers:{Authorization:'Bearer '+window._tk}});
-    if(r.ok){const remote=await r.json();const ids=new Set((remote.kontrollen||[]).map(k=>k.id));const merged=(remote.kontrollen||[]).concat(mine.filter(k=>!ids.has(k.id)));QM.data.kontrollen=merged;
+    if(r.ok){const remote=await r.json();
+      // Gleiche Id: die zuletzt geänderte Fassung gewinnt (nachträgliche Bearbeitung,
+      // 10.11.2026). Vorher gewann immer der Server — eine Korrektur wäre verloren gegangen.
+      const stamp=k=>Date.parse(k&&(k.geaendert||k.datum)||0)||0;
+      const lokal=new Map(mine.map(k=>[k.id,k]));
+      const merged=(remote.kontrollen||[]).map(k=>{const l=lokal.get(k.id);return l&&stamp(l)>stamp(k)?l:k;});
+      const ids=new Set(merged.map(k=>k.id));
+      QM.data.kontrollen=merged.concat(mine.filter(k=>!ids.has(k.id)));
       // Zuteilung ebenfalls zusammenführen; lokale Änderung gewinnt
       QM.data.zuordnung=Object.assign({},remote.zuordnung||{},QM.data.zuordnung||{});}
   }catch(e){}
@@ -2879,32 +2886,55 @@ function qmOpen(typ,key,ti){
   const{erst,doku}=qmWeekData();
   let t;if(typ==='befund'){t=erst.find(x=>x.pos===key);}else{const e=doku.find(x=>x.th===key);t=e&&(ti!==undefined?e.ts[ti]:e.t);}
   if(!t)return;
-  const K=QM_KRIT[typ];
   QM.cur={typ,t,antworten:{},note:''};
-  const pruefer=(ml.getActiveAccount()||{}).name||'';
-  const qh=K.fragen.map(f=>`<div class="qm-q"><div class="qm-q-t">${esc(f.t)}</div><div class="qm-opts">${f.o.map((o,oi)=>`<span class="qm-opt" id="opt-${f.id}-${oi}" onclick="qmAns('${f.id}',${oi})">${esc(o[0])} <span style="opacity:.6;font-size:10px">+${o[1]}</span></span>`).join('')}</div></div>`).join('');
+  qmModalZeigen();
+}
+// Nachträglich bearbeiten (10.11.2026): dieselbe Maske, vorbelegt mit den
+// gespeicherten Antworten. Termin, Patient und Therapeut:in bleiben, geändert
+// werden Antworten und Anmerkung. Wer wann geändert hat, wird mitgeschrieben,
+// die vorige Fassung bleibt in k.vorher erhalten.
+function qmEdit(id){
+  const k=(QM.data.kontrollen||[]).find(x=>x.id===id);if(!k||!QM_KRIT[k.typ])return;
+  const K=QM_KRIT[k.typ],ant={};
+  K.fragen.forEach(f=>{const a=(k.antworten||{})[f.id];if(!a)return;
+    const o=f.o.find(x=>x[0]===a.label)||f.o.find(x=>x[1]===a.pts);if(o)ant[f.id]={label:o[0],pts:o[1]};});
+  QM.cur={typ:k.typ,editId:id,antworten:ant,note:k.anmerkung||'',
+    t:{th:k.therapeut,pat:k.patient,dt:k.terminDatum?reTag(k.terminDatum):null,uz:k.uhrzeit||'',pos:k.posNr,lst:k.leistung},
+    kw:k.kw,jahr:k.jahr,pruefer:k.pruefer||k.leitung||'',datum:k.datum};
+  qmModalZeigen();
+}
+function qmModalZeigen(){
+  const c=QM.cur,typ=c.typ,t=c.t,K=QM_KRIT[typ],edit=!!c.editId;
+  const pruefer=edit?c.pruefer:((ml.getActiveAccount()||{}).name||'');
+  const qh=K.fragen.map(f=>`<div class="qm-q"><div class="qm-q-t">${esc(f.t)}</div><div class="qm-opts">${f.o.map((o,oi)=>`<span class="qm-opt${c.antworten[f.id]&&c.antworten[f.id].label===o[0]?' sel':''}" id="opt-${f.id}-${oi}" onclick="qmAns('${f.id}',${oi})">${esc(o[0])} <span style="opacity:.6;font-size:10px">+${o[1]}</span></span>`).join('')}</div></div>`).join('');
   document.getElementById('qmModal').innerHTML=`
-    <div class="qm-m-h ${typ==='befund'?'bf':'dk'}"><h3>${K.icon} ${K.titel}</h3><p>KW ${QM.kw} · ${QM.jahr}</p></div>
+    <div class="qm-m-h ${typ==='befund'?'bf':'dk'}"><h3>${K.icon} ${K.titel}${edit?' · bearbeiten':''}</h3><p>KW ${edit?c.kw:QM.kw} · ${edit?c.jahr:QM.jahr}</p></div>
     <div class="qm-m-b">
       <div class="qm-meta">
         <div><span class="lbl">Therapeut:in</span><b>${esc(t.th)}</b></div>
         <div><span class="lbl">Patient:in</span><b>${esc(t.pat)}</b></div>
-        <div><span class="lbl">Termin</span><b>${fmtD(t.dt)} ${t.uz}</b></div>
+        <div><span class="lbl">Termin</span><b>${t.dt?fmtD(t.dt):'—'} ${esc(t.uz||'')}</b></div>
         <div><span class="lbl">${typ==='befund'?'Rezept-Nr.':'Leistung'}</span><b>${esc(typ==='befund'?posShort(t.pos):(t.lst||'—'))}</b></div>
         <div><span class="lbl">Prüfer:in</span><b>${esc(pruefer)}</b></div>
-        <div><span class="lbl">Prüfdatum</span><b>${new Date().toLocaleDateString('de-DE')}</b></div>
+        <div><span class="lbl">Prüfdatum</span><b>${edit&&c.datum?new Date(c.datum).toLocaleDateString('de-DE'):new Date().toLocaleDateString('de-DE')}</b></div>
       </div>
       ${qh}
       <div class="qm-live"><span style="font-size:12px;color:var(--muted)">Ergebnis</span><b id="qmLive">— / ${qmMax(typ)} Punkte</b></div>
       <textarea class="qm-note" id="qmNote" placeholder="Anmerkung (optional) …"></textarea>
     </div>
-    <div class="qm-m-f"><button class="qm-btn sec" onclick="qmClose()">Abbrechen</button><button class="qm-btn pri" id="qmSaveBtn" disabled onclick="qmSubmit()">Speichern</button></div>`;
+    <div class="qm-m-f"><button class="qm-btn sec" onclick="qmClose()">Abbrechen</button><button class="qm-btn pri" id="qmSaveBtn" disabled onclick="qmSubmit()">${edit?'Änderung speichern':'Speichern'}</button></div>`;
+  document.getElementById('qmNote').value=c.note||'';
+  qmLiveRechnen();
   document.getElementById('qmOv').classList.add('open');
 }
 function qmAns(fid,oi){
   const K=QM_KRIT[QM.cur.typ];const f=K.fragen.find(x=>x.id===fid);
   QM.cur.antworten[fid]={label:f.o[oi][0],pts:f.o[oi][1]};
   f.o.forEach((o,i)=>{document.getElementById('opt-'+fid+'-'+i).classList.toggle('sel',i===oi);});
+  qmLiveRechnen();
+}
+function qmLiveRechnen(){
+  const K=QM_KRIT[QM.cur.typ];
   const all=K.fragen.every(x=>QM.cur.antworten[x.id]!==undefined);
   const pts=Object.values(QM.cur.antworten).reduce((s,a)=>s+a.pts,0),mx=qmMax(QM.cur.typ);
   const lv=document.getElementById('qmLive');
@@ -2919,6 +2949,23 @@ async function qmSubmit(){
   const K=QM_KRIT[c.typ];const mx=qmMax(c.typ);
   const pts=Object.values(c.antworten).reduce((s,a)=>s+a.pts,0);
   const p=Math.round(pts/mx*100);
+  if(c.editId){
+    const k=QM.data.kontrollen.find(x=>x.id===c.editId);if(!k){qmClose();return;}
+    const alt=JSON.parse(JSON.stringify(k));delete alt.vorher;
+    const neu=Object.assign({},k,{
+      antworten:Object.fromEntries(K.fragen.map(f=>[f.id,{frage:f.t,...c.antworten[f.id]}])),
+      punkte:pts,maxPunkte:mx,prozent:p,stufe:qmStufe(p).n,
+      anmerkung:document.getElementById('qmNote').value.trim(),
+      geaendert:new Date().toISOString(),
+      geaendertVon:(ml.getActiveAccount()||{}).name||qmMail()||'',
+      vorher:(k.vorher||[]).concat([{punkte:alt.punkte,prozent:alt.prozent,antworten:alt.antworten,anmerkung:alt.anmerkung,
+        stand:alt.geaendert||alt.datum,von:alt.geaendertVon||alt.pruefer||''}])});
+    const btn=document.getElementById('qmSaveBtn');btn.disabled=true;btn.textContent='Speichere…';
+    const idx=QM.data.kontrollen.indexOf(k);QM.data.kontrollen[idx]=neu;
+    try{await qmSave();qmClose();rQM();}
+    catch(e){QM.data.kontrollen[idx]=k;btn.disabled=false;btn.textContent='Änderung speichern';alert('Speichern fehlgeschlagen: '+e.message+'\nBitte erneut versuchen.');}
+    return;
+  }
   const rec={
     id:Date.now()+'-'+Math.random().toString(36).slice(2,8),
     typ:c.typ,therapeut:c.t.th,patient:c.t.pat,posNr:c.t.pos,leistung:c.t.lst,standort:c.t.standort,region:c.t.region||'Kitzingen',
@@ -2990,7 +3037,7 @@ function rQMAn(){
       const items=[...r.list].sort((a,b)=>new Date(b.datum)-new Date(a.datum)).map(k=>{
         const st=qmStufe(k.prozent);
         const dets=Object.values(k.antworten||{}).filter(a=>a.pts<2).map(a=>esc(a.frage.split('?')[0])+': '+esc(a.label)).join(' · ');
-        return`<div class="dr"><span>${QM_KRIT[k.typ].icon} ${k.typ==='befund'?'Befund':'Doku'} · KW ${k.kw}/${k.jahr} · ${esc(k.patient)}${k.terminDatum?` <span style="color:var(--muted);font-weight:400">· Termin vom ${reTag(k.terminDatum).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})}${k.uhrzeit?', '+esc(k.uhrzeit)+' Uhr':''}</span>`:''}</span><span style="font-weight:700;color:${st.c}">${k.punkte}/${k.maxPunkte} · ${k.prozent}%</span><span style="width:100%;color:var(--muted);font-size:11px">ausgefüllt von <b style="color:var(--dark);font-weight:600">${esc(k.pruefer||k.leitung||'unbekannt')}</b>${k.datum?' am '+new Date(k.datum).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+', '+new Date(k.datum).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr':''}</span>${dets?`<span style="width:100%;color:var(--muted);font-size:11px">Abzüge: ${dets}</span>`:''}${k.anmerkung?`<span style="width:100%;font-style:italic;color:var(--muted);font-size:11px">„${esc(k.anmerkung)}" – ${esc(k.pruefer)}</span>`:''}</div>`;
+        return`<div class="dr"><span>${QM_KRIT[k.typ].icon} ${k.typ==='befund'?'Befund':'Doku'} · KW ${k.kw}/${k.jahr} · ${esc(k.patient)}${k.terminDatum?` <span style="color:var(--muted);font-weight:400">· Termin vom ${reTag(k.terminDatum).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})}${k.uhrzeit?', '+esc(k.uhrzeit)+' Uhr':''}</span>`:''}</span><span style="font-weight:700;color:${st.c}">${k.punkte}/${k.maxPunkte} · ${k.prozent}%</span><span style="width:100%;color:var(--muted);font-size:11px">ausgefüllt von <b style="color:var(--dark);font-weight:600">${esc(k.pruefer||k.leitung||'unbekannt')}</b>${k.datum?' am '+new Date(k.datum).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+', '+new Date(k.datum).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr':''}</span>${dets?`<span style="width:100%;color:var(--muted);font-size:11px">Abzüge: ${dets}</span>`:''}${k.geaendert?`<span style="width:100%;color:var(--muted);font-size:11px">✏️ bearbeitet von <b style="color:var(--dark);font-weight:600">${esc(k.geaendertVon||'unbekannt')}</b> am ${new Date(k.geaendert).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}, ${new Date(k.geaendert).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr${(k.vorher&&k.vorher.length)?' · vorher '+k.vorher[k.vorher.length-1].prozent+'%':''}</span>`:''}${k.anmerkung?`<span style="width:100%;font-style:italic;color:var(--muted);font-size:11px">„${esc(k.anmerkung)}" – ${esc(k.pruefer)}</span>`:''}<span style="width:100%"><button class="qm-btn sec" style="padding:3px 10px;font-size:11px;margin-top:2px" onclick="event.stopPropagation();qmEdit('${String(k.id).replace(/'/g,"\\'")}')">✏️ Bearbeiten</button></span></div>`;
       }).join('');
       det=`<tr><td colspan="7" style="white-space:normal"><div class="qm-detail">${items}</div></td></tr>`;
     }

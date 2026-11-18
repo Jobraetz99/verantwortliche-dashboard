@@ -907,6 +907,19 @@ async function loadAll(){
         tx.forEach(t=>{try{const o=JSON.parse(String(t||'').replace(/^\uFEFF/,''));
           const k=mwNotizKey(o.id,mwStufe(o.stufe),o.datum);if(k)notizen[k]=String(o.notiz||'').trim();}catch(e){}});
       }
+      // Ausfülldatum: Die CSV trägt das Datum, an dem der Fragebogen ANGELEGT
+      // wurde (createdOn). MyWellness zeigt aber „Ausgefüllt am" = lastUpdatedOn,
+      // und in diese Woche gehört das Gespräch (Winkler: angelegt 11.11.,
+      // ausgefüllt 17.11.). Der Flow legt je Gespräch eine Datei in
+      // <Standort>/Ausgefuellt/ ab: {id, stufe, angelegt:yyyyMMdd, ausgefuellt:yyyyMMdd}.
+      const ausgef={};
+      for(const q of quellen){
+        const af=(await kinder(q.pfad+'Ausgefuellt/')).filter(x=>x.file&&/\.json$/i.test(x.name));
+        const tx=await Promise.all(af.map(d=>tGet(q.pfad+'Ausgefuellt/'+d.name)));
+        tx.forEach(t=>{try{const o=JSON.parse(String(t||'').replace(/^\uFEFF/,''));
+          const k=mwNotizKey(o.id,mwStufe(o.stufe),mwYmdDatum(o.angelegt));
+          const a=mwYmdDatum(o.ausgefuellt);if(k&&a)ausgef[k]=a;}catch(e){}});
+      }
       // Gruppen aus dem CRM (Club-Mitglieder, Praeventionskurse): je Gruppe
       // eine Datei in <Standort>/Gruppen/.
       for(const q of quellen){
@@ -927,7 +940,9 @@ async function loadAll(){
         const st=kd.map(d=>new Date(d.lastModifiedDateTime)).filter(t=>!isNaN(t)).sort((a,b)=>b-a)[0]||null;
         KU.orte[q.ort]={sessions:kuParse(kt),stand:st};
       }
-      return mwNotizenAnhaengen(mwOhneDoppel(alle),notizen);
+      // Erst die Anmerkungen (ihr Schlüssel ist das Anlegedatum), dann das
+      // Datum auf den Ausfülltag setzen.
+      return mwAusgefuelltSetzen(mwNotizenAnhaengen(mwOhneDoppel(alle),notizen),ausgef);
     })().catch(()=>[]);
     // Auf alles warten
     // Rezeptende-Listen aus dem Patientenchecker: je Tag und Standort, wer am
@@ -2637,6 +2652,27 @@ function mwNotizKey(id,stufe,datum){
 // abgerufen wurde, und ist '', wenn im Fragebogen nichts eingetragen war.
 function mwNotizenAnhaengen(saetze,notizen){
   (saetze||[]).forEach(r=>{const k=mwNotizKey(r.id,r.stufe,r.dt);if(k&&Object.prototype.hasOwnProperty.call(notizen,k))r.notiz=notizen[k];});
+  return saetze;
+}
+// yyyyMMdd (Zahl oder Text, wie MyWellness es liefert) → Date, 12 Uhr Ortszeit.
+// Mittags, damit kein Zeitzonen-Versatz den Tag in die Nachbarwoche schiebt.
+function mwYmdDatum(v){
+  const m=String(v==null?'':v).match(/^(\d{4})-?(\d{2})-?(\d{2})/);
+  if(!m)return null;
+  const d=new Date(+m[1],+m[2]-1,+m[3],12,0,0);
+  return isNaN(d)?null:d;
+}
+// Setzt dt auf den Ausfülltag, wenn der Flow ihn geliefert hat. Das
+// Anlegedatum bleibt als r.angelegt erhalten. Ein Ausfülltag VOR dem
+// Anlegetag wäre widersprüchlich und wird nicht übernommen.
+function mwAusgefuelltSetzen(saetze,ausgef){
+  (saetze||[]).forEach(r=>{
+    const k=mwNotizKey(r.id,r.stufe,r.dt);if(!k||!ausgef[k])return;
+    const a=ausgef[k];
+    if(bYMD(a)<bYMD(r.dt))return;
+    if(bYMD(a)===bYMD(r.dt))return;
+    r.angelegt=r.dt;r.dt=a;
+  });
   return saetze;
 }
 function mwOhneDoppel(saetze){

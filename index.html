@@ -1994,7 +1994,13 @@ function reKitzTage(beh,pl,heuteIso,endeMap){
     (d.Verordnungen||[]).forEach(v=>(v.Termine||[]).forEach(x=>{if(x&&x.Datum&&RE_MF_STATUS.has(x.Status))spaeter.push(String(x.Datum).slice(0,10));}));
     (d.Terminreservierungen||[]).forEach(r=>{const b=r&&(r.Beginn||r.beginn||r.Datum);if(b)spaeter.push(String(b).slice(0,10));});
     (d.Verordnungen||[]).forEach(v=>{
-      if(!v||v.IsReadOnly||reKeinRezept(v.Beschreibung))return;
+      // NICHT nach IsReadOnly filtern: Medifox setzt es, sobald das Rezept
+      // abgerechnet ist — also kurz nach dem letzten Termin. Gefiltert fielen
+      // genau die abgeschlossenen Rezepte vergangener Wochen weg, und übrig
+      // blieben nur die mit Folgetermin (KW 45: 24 von 32 fehlten, 18.11.2026).
+      // Abgerechnete Rezepte haben keine geplanten Termine mehr; ihr letzter
+      // Termin ist also der echte.
+      if(!v||reKeinRezept(v.Beschreibung))return;
       const te=(v.Termine||[]).filter(x=>x&&x.Datum&&RE_MF_STATUS.has(x.Status))
         .map(x=>({ds:String(x.Datum).slice(0,10),uz:String(x.Datum).length>10?bHM(parseZeit(x.Datum)):'',th:x.MitarbeiterName||''})).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0);
       const tage=[...new Set(te.map(x=>x.ds))];if(!tage.length)return;

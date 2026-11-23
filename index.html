@@ -1418,7 +1418,7 @@ function qmMax(typ){return QM_KRIT[typ].fragen.reduce((s,f)=>s+Math.max(...f.o.m
 // Bewertungsstufen (aus dem QM-Standard, in % je Kontrolltyp)
 function qmStufe(p){return p>=90?{n:'sehr vollständig',cls:'g',c:'var(--teal)'}:p>=75?{n:'vollständig',cls:'g',c:'var(--green)'}:p>=60?{n:'eher unvollständig',cls:'y',c:'var(--amber)'}:{n:'unvollständig',cls:'r',c:'var(--red)'};}
 
-let QM={data:{kontrollen:[],zuordnung:{}},kw:null,jahr:null,showAllB:false,showAllD:false,openD:{},anTyp:'beide',anZeit:'YTD',anOpen:null,cur:null,etagWarned:false,cfgOpen:false,nurMeine:true};
+let QM={data:{kontrollen:[],zuordnung:{}},kw:null,jahr:null,showAllB:false,showAllD:false,openD:{},sortB:qmSortBInit(),openB:{},anTyp:'beide',anZeit:'YTD',anOpen:null,cur:null,etagWarned:false,cfgOpen:false,nurMeine:true};
 
 /* --- Fachliche Leitungen ----------------------------------------------------
    Erkennung ueber die Login-E-Mail (MSAL username). Welche Therapeut:innen zu
@@ -1429,6 +1429,11 @@ const QM_LEITUNG=[
   {mail:'paula@kimojo-physio.de',kurz:'Paula'},
   {mail:'monika@kimojo-physio.de',kurz:'Monika'}
 ];
+// Befund-Liste: 'datum' (Standard, wie bisher) oder 'th' (gruppiert je Therapeut:in wie Doku).
+// Pro Browser gemerkt; ohne Speicher (privates Fenster) einfach 'datum'.
+function qmSortBInit(){try{return localStorage.getItem('qmSortB')==='th'?'th':'datum';}catch(e){return'datum';}}
+function qmSetSortB(v){QM.sortB=v;QM.showAllB=false;QM.openB={};try{localStorage.setItem('qmSortB',v);}catch(e){}rQM();}
+function qmTogB(th){QM.openB[th]=!QM.openB[th];rQM();}
 function qmMail(){return String((ml.getActiveAccount()||{}).username||'').toLowerCase();}
 function qmMe(){const m=qmMail();return QM_LEITUNG.find(l=>l.mail===m)||null;}
 function qmZu(){if(!QM.data.zuordnung)QM.data.zuordnung={};return QM.data.zuordnung;}
@@ -2799,7 +2804,7 @@ function qmWeekData(){
 // eigenen – das 5/5-Ziel gilt je Leitung, nicht fuer das Team zusammen.
 function qmDone(typ){const me=qmMe();
   return QM.data.kontrollen.filter(k=>k.typ===typ&&k.kw===QM.kw&&k.jahr===QM.jahr&&(REG==='Allgemein'||(k.region||'Kitzingen')===REG)&&(!me||!QM.nurMeine||k.leitung===me.mail));}
-function qmChW(d){if(QM.kw===null)return;let kw=QM.kw+d,j=QM.jahr;if(kw<1){j--;kw=kwOf(tzWall(j,11,28)).kw;}else if(kw>kwOf(tzWall(j,11,28)).kw){j++;kw=1;}const cur=kwOf(new Date());if(j>cur.jahr||(j===cur.jahr&&kw>cur.kw))return;QM.kw=kw;QM.jahr=j;QM.showAllB=false;QM.showAllD=false;QM.openD={};rQM();}
+function qmChW(d){if(QM.kw===null)return;let kw=QM.kw+d,j=QM.jahr;if(kw<1){j--;kw=kwOf(tzWall(j,11,28)).kw;}else if(kw>kwOf(tzWall(j,11,28)).kw){j++;kw=1;}const cur=kwOf(new Date());if(j>cur.jahr||(j===cur.jahr&&kw>cur.kw))return;QM.kw=kw;QM.jahr=j;QM.showAllB=false;QM.showAllD=false;QM.openD={};QM.openB={};rQM();}
 
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtD=d=>d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});
@@ -2823,6 +2828,7 @@ function rQM(){
   const soTag=t=>REG==='Allgemein'?' · '+esc(t.standort||'')+(t.region==='Werneck'?' (Werneck)':''):REG==='Werneck'?' · '+esc(String(t.standort||'').replace(/^(KIMOJO|Werneck)\s*/,'')):'';
   const doneB={};dB.forEach(k=>{doneB[k.posNr]=k;});
   let listB=[...erst];
+  if(QM.sortB==='th')listB=[];// Therapeuten-Ansicht rendert unten eigene Gruppen
   if(!QM.showAllB&&listB.length>8){const vis=listB.filter(t=>suggB.has(t.pos)||doneB[t.pos]);var hidB=listB.length-vis.length;listB=vis;}
   const bh=listB.map(t=>{
     const k=doneB[t.pos];
@@ -2832,6 +2838,43 @@ function rQM(){
     if(t.th==='—')return`<div class="qm-item na"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">Therapeut:in nicht belegt</div><div class="qm-t2">${esc(t.pat)} · ${fmtD(t.dt)} ${t.uz} · Rp. ${esc(posShort(t.pos))}${soTag(t)}</div></div></div>`;
     return`<div class="qm-item${suggB.has(t.pos)?' sugg':''}" onclick="qmOpen('befund','${esc(t.pos)}')"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(t.th)}</div><div class="qm-t2">${esc(t.pat)} · ${fmtD(t.dt)} ${t.uz} · Rp. ${esc(posShort(t.pos))}${soTag(t)}</div></div>${suggB.has(t.pos)?'<span class="qm-tag">Vorschlag</span>':''}</div>`;
   }).join('');
+  // Therapeuten-Ansicht (Wunsch Leitungen 11/2026): gleiche Logik wie die Doku-Spalte –
+  // eine Zeile je Therapeut:in, am laengsten nicht befund-kontrollierte zuerst,
+  // ueber "N Ersttermine ▾" alle Ersttermine der Woche waehlbar. Stichprobe/Vorschlag (suggB) bleibt dieselbe.
+  let bhTh='',hidBT=0;
+  if(QM.sortB==='th'){
+    const lastB={};QM.data.kontrollen.filter(k=>k.typ==='befund').forEach(k=>{const d=new Date(k.datum);if(!lastB[k.therapeut]||d>lastB[k.therapeut])lastB[k.therapeut]=d;});
+    const grp={};erst.forEach(t=>{if(!t.th||t.th==='—')return;(grp[t.th]=grp[t.th]||[]).push(t);});
+    let gs=Object.entries(grp).map(([th,ts])=>{
+      // Vorschlag fuer den Zeilenklick: erster offener Stichproben-Termin, sonst erster offener Termin
+      const offen=ts.filter(t=>!doneB[t.pos]);
+      return{th,ts,last:lastB[th]||null,done:ts.filter(t=>doneB[t.pos]),pick:offen.find(t=>suggB.has(t.pos))||offen[0]||null,sugg:ts.some(t=>suggB.has(t.pos)&&!doneB[t.pos])};
+    });
+    gs.sort((a,b)=>{const la=a.last?a.last.getTime():0,lb=b.last?b.last.getTime():0;return la-lb||a.th.localeCompare(b.th,'de');});
+    if(!QM.showAllB&&gs.length>8){const vis=gs.filter(g=>g.sugg||g.done.length);hidBT=gs.length-vis.length;gs=vis;}
+    // Ersttermine ohne belegte Therapeut:in: sichtbar ausweisen, nicht zuordnen
+    const ohne=erst.filter(t=>t.th==='—');
+    const item=t=>{const k=doneB[t.pos];const t2=`${fmtD(t.dt)} ${t.uz} · Rp. ${esc(posShort(t.pos))}${soTag(t)}`;
+      if(k){const st=qmStufe(k.prozent);return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(t.pat)}</div><div class="qm-t2">${t2}</div></div><span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${k.prozent}%</span></div>`;}
+      return`<div class="qm-item" onclick="qmOpen('befund','${esc(t.pos)}')"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(t.pat)}</div><div class="qm-t2">${t2}</div></div>${suggB.has(t.pos)?'<span class="qm-tag">Vorschlag</span>':''}</div>`;};
+    bhTh=gs.map(g=>{
+      const thA=esc(g.th).replace(/'/g,"\\'");
+      const open=!!QM.openB[g.th];
+      const lastTxt=g.last?'zuletzt '+g.last.toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'2-digit'}):'noch nie kontrolliert';
+      const alt=`<span class="qm-alt" onclick="event.stopPropagation();qmTogB('${thA}')">${g.ts.length} Ersttermin${g.ts.length===1?'':'e'} ${open?'▴':'▾'}</span>`;
+      const sub=open?'<div class="qm-sub">'+g.ts.map(item).join('')+'</div>':'';
+      if(!g.pick){// alle Ersttermine dieser Woche kontrolliert
+        const k=doneB[g.done[g.done.length-1].pos];const st=qmStufe(k.prozent);
+        return`<div class="qm-item ok"><span class="qm-chk">✓</span><div class="qm-main"><div class="qm-t1">${esc(g.th)}</div><div class="qm-t2">${g.done.length} von ${g.ts.length} kontrolliert · ${lastTxt}</div></div>${alt}<span class="qm-score-pill" style="background:${st.c}18;color:${st.c}">${k.prozent}%</span></div>${sub}`;}
+      const p=g.pick;const dn=g.done.length?` · ${g.done.length} kontrolliert`:'';
+      return`<div class="qm-item${g.sugg?' sugg':''}" onclick="qmOpen('befund','${esc(p.pos)}')"><span class="qm-chk">${g.done.length?'✓':''}</span><div class="qm-main"><div class="qm-t1">${esc(g.th)}</div><div class="qm-t2">${esc(p.pat)} · ${fmtD(p.dt)} ${p.uz}${soTag(p)}${dn} · ${lastTxt}</div></div>${alt}${g.sugg?'<span class="qm-tag">Vorschlag</span>':''}</div>${sub}`;
+    }).join('');
+    if(ohne.length){const open=!!QM.openB['—'];
+      bhTh+=`<div class="qm-item na"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">Therapeut:in nicht belegt</div><div class="qm-t2">${ohne.length} Ersttermin${ohne.length===1?'':'e'} ohne Zuordnung · nicht kontrollierbar</div></div><span class="qm-alt" onclick="event.stopPropagation();qmTogB('—')">${ohne.length} ${open?'▴':'▾'}</span></div>`
+        +(open?'<div class="qm-sub">'+ohne.map(t=>`<div class="qm-item na"><span class="qm-chk"></span><div class="qm-main"><div class="qm-t1">${esc(t.pat)}</div><div class="qm-t2">${fmtD(t.dt)} ${t.uz} · Rp. ${esc(posShort(t.pos))}${soTag(t)}</div></div></div>`).join('')+'</div>':'');}
+  }
+  const sortSw=erst.length?`<div style="display:flex;gap:6px;align-items:center;margin:2px 6px 8px;font-size:11px;color:var(--muted)">Sortierung:`
+    +[['datum','nach Datum'],['th','nach Therapeut:in']].map(([v,l])=>`<span class="qm-alt" style="${QM.sortB===v?'color:var(--red);border-color:var(--red)':''}" onclick="qmSetSortB('${v}')">${l}</span>`).join('')+`</div>`:'';
   // Was aus der Stichprobe genommen wurde, steht ueber der Liste. Ein Filter,
   // der schweigt, laesst die Liste leer aussehen statt sauber.
   const ausSum=Object.keys(ausGez||{}).reduce((n,k)=>n+ausGez[k],0);
@@ -2842,7 +2885,8 @@ function rQM(){
     +`gibt es bei Kursen, Platzhaltern und passiven Wärmeanwendungen keine Antwort.</div>`:'';
   const naHint=ausHint+(naW>0?`<div class="qm-note"><b>${naW} Termine dieser Woche ohne Therapeuten-Zuordnung.</b> Bei diesen Terminen ist in thevea kein Mitarbeiter eingetragen. Sie bleiben leer, statt geraten zu werden.</div>`:'');
   // Bei fehlender Zuordnung erklaert der Hinweis die leere Liste – dann kein zweites "nichts gefunden"
-  document.getElementById('qmListB').innerHTML=naHint+(bh||(naW>0?'':'<div class="qm-empty">Keine Ersttermine in dieser Woche gefunden.</div>'))+(!QM.showAllB&&typeof hidB!=='undefined'&&hidB>0?`<div class="qm-more" onclick="QM.showAllB=true;rQM()">+ ${hidB} weitere Ersttermine anzeigen</div>`:'');
+  if(QM.sortB==='th')document.getElementById('qmListB').innerHTML=naHint+sortSw+(bhTh||(naW>0?'':'<div class="qm-empty">Keine Ersttermine in dieser Woche gefunden.</div>'))+(!QM.showAllB&&hidBT>0?`<div class="qm-more" onclick="QM.showAllB=true;rQM()">+ ${hidBT} weitere Therapeut:innen anzeigen</div>`:'');
+  else document.getElementById('qmListB').innerHTML=naHint+sortSw+(bh||(naW>0?'':'<div class="qm-empty">Keine Ersttermine in dieser Woche gefunden.</div>'))+(!QM.showAllB&&typeof hidB!=='undefined'&&hidB>0?`<div class="qm-more" onclick="QM.showAllB=true;rQM()">+ ${hidB} weitere Ersttermine anzeigen</div>`:'');
   // Doku-Liste
   const doneD={};dD.forEach(k=>{doneD[k.therapeut]=k;});
   let listD=[...doku];
